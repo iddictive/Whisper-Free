@@ -1,4 +1,4 @@
-<p align="center">
+<p align="left">
   <img src="banner.png" alt="Whisper Free" width="600">
 </p>
 
