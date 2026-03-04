@@ -246,7 +246,7 @@ struct MenuBarView: View {
                 NSApplication.shared.terminate(nil)
             }
         }
-        .frame(width: 300)
+        .frame(width: 340)
         .onAppear {
             if !appState.settings.setupCompleted {
                 DispatchQueue.main.async {
