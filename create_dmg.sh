@@ -19,7 +19,14 @@ cp -R "$APP_BUNDLE" "$TEMP_DIR/"
 # 3. Create symlink to /Applications
 ln -s /Applications "$TEMP_DIR/Applications"
 
-# 4. Create DMG
+# 4. Set Volume Icon (optional but professional)
+# Note: This works best when creating the DMG from a folder
+cp "Sources/WhisperFree/Resources/AppIcon.icns" "$TEMP_DIR/.VolumeIcon.icns"
+# Set the custom icon bit on the folder before hdiutil
+# (Requires SetFile from Xcode tools, which the user likely has)
+command -v SetFile >/dev/null 2>&1 && SetFile -a C "$TEMP_DIR"
+
+# 5. Create DMG
 rm -f "$DMG_NAME"
 hdiutil create -volname "$APP_NAME" -srcfolder "$TEMP_DIR" -ov -format UDZO "$DMG_NAME"
 

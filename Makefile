@@ -18,6 +18,7 @@ app: build
 	@mkdir -p WhisperFree.app/Contents/Resources
 	@cp .build/release/WhisperFree WhisperFree.app/Contents/MacOS/
 	@cp Sources/WhisperFree/Resources/Info.plist WhisperFree.app/Contents/
+	@cp Sources/WhisperFree/Resources/AppIcon.icns WhisperFree.app/Contents/Resources/
 	@echo "✅ WhisperFree.app created"
 	@echo "   Run: open WhisperFree.app"
 
