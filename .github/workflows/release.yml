@@ -34,15 +34,25 @@ jobs:
 
       - name: Build App
         run: |
-          swift build -c release
+          swift build -c release --arch arm64 --arch x86_64
           mkdir -p WhisperFree.app/Contents/MacOS
           mkdir -p WhisperFree.app/Contents/Resources
-          cp .build/release/WhisperFree WhisperFree.app/Contents/MacOS/
+          
+          # Find the binary dynamically as it might be in different subfolders
+          ACTUAL_BINARY=$(find .build -name "WhisperFree" -type f | grep release | head -n 1)
+          if [ -z "$ACTUAL_BINARY" ]; then
+            echo "❌ Binary not found!"
+            exit 1
+          fi
+          echo "Found binary at: $ACTUAL_BINARY"
+          
+          cp "$ACTUAL_BINARY" WhisperFree.app/Contents/MacOS/
           cp Sources/WhisperFree/Resources/Info.plist WhisperFree.app/Contents/
           
           # Inject version into Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ env.APP_VERSION }}" "WhisperFree.app/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ env.APP_VERSION }}" "WhisperFree.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable WhisperFree" "WhisperFree.app/Contents/Info.plist"
           
           if [ -f Sources/WhisperFree/Resources/AppIcon.icns ]; then
             cp Sources/WhisperFree/Resources/AppIcon.icns WhisperFree.app/Contents/Resources/
