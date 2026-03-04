@@ -37,18 +37,6 @@ struct RecordingOverlayContent: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Status Indicator (Unified)
-            ZStack {
-                Circle()
-                    .fill(statusColor.opacity(0.3))
-                    .frame(width: 8, height: 8)
-                    .scaleEffect(isPulsing ? 1.4 : 1.0)
-                
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 8, height: 8)
-            }
-            .animation(isPulsing ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true) : .default, value: appState.state)
 
             if appState.state == .recording {
                 WaveformView(levels: recorder.audioLevels)
@@ -92,6 +80,19 @@ struct RecordingOverlayContent: View {
                     .foregroundStyle(.white)
                     .transition(.opacity)
             }
+            
+            // Status Indicator (Unified) - Moved to Right
+            ZStack {
+                Circle()
+                    .fill(statusColor.opacity(0.3))
+                    .frame(width: 8, height: 8)
+                    .scaleEffect(isPulsing ? 1.4 : 1.0)
+                
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+            }
+            .animation(isPulsing ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true) : .default, value: appState.state)
             
             if let _ = appState.lastError {
                 Button {

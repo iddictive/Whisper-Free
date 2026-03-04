@@ -234,15 +234,20 @@ struct MenuBarIconView: View {
             }
             
             // Status Dot Overlay (Spoof Style)
-            if let color = statusColor {
+            let color = statusColor
+            ZStack {
+                // White "Halo" for contrast
                 Circle()
-                    .fill(color)
-                    .frame(width: 5.0, height: 5.0)
-                    .overlay(Circle().stroke(Color.black, lineWidth: 0.5))
-                    .offset(x: 6.5, y: 5.5)
-                    // Pulse or Blink depending on state
-                    .opacity((state == .processing || state == .typing) && !blink ? 0.4 : 1.0)
+                    .fill(Color.white)
+                    .frame(width: 6.5, height: 6.5)
+                
+                Circle()
+                    .fill(color ?? Color.clear)
+                    .frame(width: 4.5, height: 4.5)
             }
+            .offset(x: 6.8, y: 6.5)
+            // Pulse or Blink depending on state
+            .opacity(color == nil ? 0 : ((state == .processing || state == .typing) && !blink ? 0.4 : 1.0))
         }
         .onAppear {
             startAnimation()
