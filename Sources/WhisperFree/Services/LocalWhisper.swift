@@ -12,9 +12,7 @@ final class LocalWhisper: TranscriptionEngine {
     }
 
     func transcribe(audioURL: URL, language: String?) async throws -> String {
-        let modelPath = Storage.modelsDirectory.appendingPathComponent(modelSize.fileName).path
-
-        guard FileManager.default.fileExists(atPath: modelPath) else {
+        guard let modelPath = AppState.shared.modelManager.findModelPath(for: modelSize)?.path else {
             throw TranscriptionError.modelNotDownloaded
         }
 

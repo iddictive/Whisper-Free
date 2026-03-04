@@ -24,15 +24,39 @@ final class ModelManager: NSObject, ObservableObject, URLSessionDownloadDelegate
     }
 
     func refreshDownloadedModels() {
-        let dir = Storage.modelsDirectory
         var models = Set<String>()
         for size in LocalModelSize.allCases {
-            let path = dir.appendingPathComponent(size.fileName)
-            if FileManager.default.fileExists(atPath: path.path) {
+            if findModelPath(for: size) != nil {
                 models.insert(size.rawValue)
             }
         }
         downloadedModels = models
+    }
+
+    /// Finds the actual path for a model file, checking local storage first, then system paths.
+    func findModelPath(for size: LocalModelSize) -> URL? {
+        // 1. Check App Storage (Sandboxed/Internal)
+        let localPath = Storage.modelsDirectory.appendingPathComponent(size.fileName)
+        if FileManager.default.fileExists(atPath: localPath.path) {
+            return localPath
+        }
+
+        // 2. Check Legacy / System paths
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser
+        let systemPaths = [
+            "/opt/homebrew/share/whisper-cpp/models/\(size.fileName)",
+            "/usr/local/share/whisper-cpp/models/\(size.fileName)",
+            homeDir.appendingPathComponent("Library/Application Support/superwhisper/Models/\(size.fileName)").path,
+            homeDir.appendingPathComponent(".cache/whisper/\(size.fileName)").path
+        ]
+
+        for path in systemPaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return URL(fileURLWithPath: path)
+            }
+        }
+
+        return nil
     }
 
     func isModelDownloaded(_ size: LocalModelSize) -> Bool {
