@@ -17,6 +17,7 @@ echo "🔢 Version: $VERSION (commits: $COMMIT_COUNT)"
 # Update Info.plist before build
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$INFO_PLIST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable $APP_NAME" "$INFO_PLIST"
 
 echo "🚀 Starting deployment v$VERSION..."
 
