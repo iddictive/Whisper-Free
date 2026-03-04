@@ -1,0 +1,14 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>WhisperFree</title>
+        <item>
+            <title>2.0.0</title>
+            <pubDate>Wed, 04 Mar 2026 08:21:32 -0500</pubDate>
+            <sparkle:version>2.0.0</sparkle:version>
+            <sparkle:shortVersionString>2.0.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>10.13</sparkle:minimumSystemVersion>
+            <enclosure url="https://raw.githubusercontent.com/iddictive/Whisper-Free/main/WhisperFree.dmg" length="2622597" type="application/octet-stream"/>
+        </item>
+    </channel>
+</rss>

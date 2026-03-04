@@ -21,7 +21,7 @@
     <key>SUFeedURL</key>
     <string>https://raw.githubusercontent.com/iddictive/Whisper-Free/main/appcast.xml</string>
     <key>SUPublicEDKey</key>
-    <string>UNSET_SIGNING_KEY_PLEASE_REPLACE</string>
+    <string>fVXcqLnofmaw9VtxYN9bnEM6lAlhbVDAu7vFudJjsHM=</string>
     <key>SUEnableAutomaticChecks</key>
     <true/>
     <key>SUAutomaticallyUpdate</key>
