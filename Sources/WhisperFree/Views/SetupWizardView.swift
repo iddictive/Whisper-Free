@@ -12,7 +12,6 @@ struct SetupWizardView: View {
     @State private var selectedModel: LocalModelSize = .base
     @State private var isTestingAPI = false
     @State private var apiTestResult: String?
-    @State private var accessibilityGranted = false
     @State private var micGranted = false
     @State private var whisperInstalled = false
     @State private var animateGlow = false
@@ -259,12 +258,12 @@ struct SetupWizardView: View {
                 icon: "hand.raised.fill",
                 title: "Accessibility",
                 desc: "For the global ⌥+Space hotkey to work anywhere",
-                granted: accessibilityGranted
+                granted: appState.isHotkeyTrusted
             ) {
                 // Prompt for accessibility if not granted
                 let options = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true] as CFDictionary
                 let granted = AXIsProcessTrustedWithOptions(options)
-                accessibilityGranted = granted
+                // AppState timer will pick this up automatically
                 
                 if !granted {
                     let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
@@ -674,7 +673,7 @@ struct SetupWizardView: View {
         VStack(spacing: 18) {
             // Checklist
             VStack(spacing: 8) {
-                readyRow("Accessibility", ok: accessibilityGranted)
+                readyRow("Accessibility", ok: appState.isHotkeyTrusted)
                 readyRow("Microphone", ok: micGranted)
                 readyRow("Engine: \(selectedEngine.rawValue)", ok: true)
                 if selectedEngine == .cloud {
@@ -824,7 +823,6 @@ struct SetupWizardView: View {
     // ═══════════════════════════════════════════════
 
     private func refreshStatus() {
-        accessibilityGranted = AXIsProcessTrusted()
         micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         whisperInstalled = checkWhisperInstalled()
         modelManager.refreshDownloadedModels()

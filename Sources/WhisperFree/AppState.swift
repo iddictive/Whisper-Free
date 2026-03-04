@@ -82,7 +82,8 @@ final class AppState: ObservableObject {
     }
 
     private func startPermissionCheckTimer() {
-        Timer.publish(every: 2, on: .main, in: .common)
+        // Run every 1 second while in common modes (prevents blocking during UI interaction)
+        Timer.publish(every: 1.0, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 guard let self = self else { return }
