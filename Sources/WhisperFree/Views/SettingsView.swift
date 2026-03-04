@@ -26,6 +26,8 @@ struct SettingsView: View {
                     .tag("transcription")
                 Label("AI Modes", systemImage: "sparkles")
                     .tag("modes")
+                Label("Usage", systemImage: "chart.bar.fill")
+                    .tag("usage")
                 Label("About", systemImage: "info.circle")
                     .tag("about")
             }
@@ -42,6 +44,7 @@ struct SettingsView: View {
                 case "recording": recordingSection
                 case "transcription": transcriptionSection
                 case "modes": modesSection
+                case "usage": usageSection
                 case "about": aboutSection
                 default: Text("Select a category")
                 }
@@ -84,56 +87,43 @@ struct SettingsView: View {
     // MARK: - Sections
 
     private var generalSection: some View {
-        Section(header: Text("AI Credentials")) {
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("OpenAI API Key", systemImage: "sparkles")
-                        .font(.subheadline.bold())
-                    
-                    SecureField("sk-...", text: $appState.settings.apiKey)
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: appState.settings.apiKey) { _, _ in
-                            appState.saveSettings()
-                        }
+        Group {
+            Section("AI Status") {
+                HStack {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(appState.settings.enablePostProcessing ? SW.accent : .secondary)
+                    Text("AI Refinement is now managed in **AI Modes**")
+                        .font(.subheadline)
+                    Spacer()
+                    Button("Go there") {
+                        selectedTab = "modes"
+                    }
+                    .buttonStyle(.link)
                 }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("Perplexity API Key", systemImage: "magnifyingglass")
-                        .font(.subheadline.bold())
-                    
-                    SecureField("pplx-...", text: $appState.settings.perplexityApiKey)
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: appState.settings.perplexityApiKey) { _, _ in
-                            appState.saveSettings()
-                        }
-                }
-                
-                Text("API keys are stored securely in your system.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.vertical, 4)
-            
-            Picker("Preferred Language", selection: $appState.settings.language) {
-                ForEach(AppSettings.supportedLanguages, id: \.code) { lang in
-                    Text(lang.name).tag(lang.code)
-                }
-            }
-            .onChange(of: appState.settings.language) { _, _ in
-                appState.saveSettings()
             }
             
-            Section("Software Updates") {
-                Toggle("Automatically check for updates", isOn: $appState.settings.automaticallyChecksForUpdates)
-                    
-                Toggle("Automatically download updates", isOn: $appState.settings.automaticallyDownloadsUpdates)
-                    .disabled(!appState.settings.automaticallyChecksForUpdates)
-                
-                Button("Check for Updates Now...") {
-                    GitHubUpdater.shared.checkForUpdates(manual: true)
+            Section("Preferences") {
+                Picker("Preferred Language", selection: $appState.settings.language) {
+                    ForEach(AppSettings.supportedLanguages, id: \.code) { lang in
+                        Text(lang.name).tag(lang.code)
+                    }
                 }
-                .padding(.top, 4)
-                .font(.caption)
+                .onChange(of: appState.settings.language) {
+                    appState.saveSettings()
+                }
+                
+                Section("Software Updates") {
+                    Toggle("Automatically check for updates", isOn: $appState.settings.automaticallyChecksForUpdates)
+                        
+                    Toggle("Automatically download updates", isOn: $appState.settings.automaticallyDownloadsUpdates)
+                        .disabled(!appState.settings.automaticallyChecksForUpdates)
+                    
+                    Button("Check for Updates Now...") {
+                        GitHubUpdater.shared.checkForUpdates(manual: true)
+                    }
+                    .padding(.top, 4)
+                    .font(.caption)
+                }
             }
         }
     }
@@ -146,7 +136,7 @@ struct SettingsView: View {
                         Label(mode.rawValue, systemImage: mode.icon).tag(mode)
                     }
                 }
-                .onChange(of: appState.settings.recordingMode) { _, _ in
+                .onChange(of: appState.settings.recordingMode) {
                     appState.saveSettings()
                 }
                 
@@ -158,7 +148,7 @@ struct SettingsView: View {
             Section("Shortcut") {
                 HotkeyRecorderView(config: $appState.settings.hotkeyConfig)
                     .padding(.vertical, 4)
-                    .onChange(of: appState.settings.hotkeyConfig) { _, _ in
+                    .onChange(of: appState.settings.hotkeyConfig) {
                         appState.saveSettings()
                         appState.reloadHotkeyManager()
                     }
@@ -166,12 +156,12 @@ struct SettingsView: View {
             
             Section("Preferences") {
                 Toggle("Auto-type into active app", isOn: $appState.settings.autoTypeResult)
-                    .onChange(of: appState.settings.autoTypeResult) { _, _ in
+                    .onChange(of: appState.settings.autoTypeResult) {
                         appState.saveSettings()
                     }
                 
                 Toggle("Show floating recording pill", isOn: $appState.settings.showOverlay)
-                    .onChange(of: appState.settings.showOverlay) { _, _ in
+                    .onChange(of: appState.settings.showOverlay) {
                         appState.saveSettings()
                     }
             }
@@ -191,7 +181,11 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.radioGroup)
-                .onChange(of: appState.settings.engineType) { _, _ in
+                .onChange(of: appState.settings.engineType) { oldValue, newValue in
+                    if newValue == .local && appState.settings.selectedModeName == TranscriptionMode.dictation.name {
+                        // Switch to next available mode if dictation is disabled for local
+                        appState.settings.selectedModeName = TranscriptionMode.notes.name
+                    }
                     appState.saveSettings()
                 }
             }
@@ -202,30 +196,8 @@ struct SettingsView: View {
                         Text(lang.name).tag(lang.code)
                     }
                 }
-                .onChange(of: appState.settings.language) { _, _ in
+                .onChange(of: appState.settings.language) {
                     appState.saveSettings()
-                }
-            }
-
-            Section("AI Refinement (Post-processing)") {
-                Picker("Engine", selection: $appState.settings.postProcessingEngine) {
-                    ForEach(PostProcessingEngine.allCases, id: \.self) { engine in
-                        Text(engine.rawValue).tag(engine)
-                    }
-                }
-                .pickerStyle(.radioGroup)
-                .onChange(of: appState.settings.postProcessingEngine) { _, _ in
-                    appState.saveSettings()
-                }
-                
-                if appState.settings.postProcessingEngine == .perplexity {
-                    Text("Perplexity Sonar: Best for intelligent grammar fix and natural flow.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("OpenAI GPT: Reliable formatting and structured refinement.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -282,7 +254,7 @@ struct SettingsView: View {
 
             Section("Advanced") {
                 Toggle("Auto-insert into active app", isOn: $appState.settings.autoTypeResult)
-                    .onChange(of: appState.settings.autoTypeResult) { _, _ in
+                    .onChange(of: appState.settings.autoTypeResult) {
                         appState.saveSettings()
                     }
             }
@@ -291,61 +263,76 @@ struct SettingsView: View {
 
     private var modesSection: some View {
         Group {
-            Section("Active Transcription Mode") {
-                ForEach(appState.settings.allModes) { mode in
-                    ModeCard(
-                        mode: mode,
-                        isSelected: appState.settings.selectedModeName == mode.name,
-                        onSelect: {
-                            appState.settings.selectedModeName = mode.name
-                            appState.saveSettings()
-                        },
-                        onDelete: mode.isBuiltIn ? nil : {
-                            appState.settings.customModes.removeAll { $0.id == mode.id }
-                            if appState.settings.selectedModeName == mode.name {
-                                appState.settings.selectedModeName = TranscriptionMode.dictation.name
+            Section("AI Refinement Configuration") {
+                AIConfigView(settings: $appState.settings, onSave: { appState.saveSettings() })
+            }
+
+            Text("Select Active Mode")
+                .font(.headline)
+                .padding(.top, 8)
+                .padding(.leading, 16)
+
+            ForEach(appState.settings.allModes) { mode in
+                // Disable dictation if local engine is enabled (User Request)
+                let isDisabled = mode.name == TranscriptionMode.dictation.name && appState.settings.engineType == .local
+                
+                if !isDisabled {
+                    Section {
+                        let isEnabled = appState.settings.isModeEnabled(mode)
+                        ModeCard(
+                            mode: mode,
+                            isSelected: appState.settings.selectedModeName == mode.name,
+                            isEnabled: isEnabled,
+                            onSelect: {
+                                if isEnabled {
+                                    appState.settings.selectedModeName = mode.name
+                                    appState.saveSettings()
+                                }
+                            },
+                            onDelete: mode.isBuiltIn ? nil : {
+                                appState.settings.customModes.removeAll { $0.id == mode.id }
+                                if appState.settings.selectedModeName == mode.name {
+                                    appState.settings.selectedModeName = TranscriptionMode.dictation.name
+                                }
+                                appState.saveSettings()
                             }
-                            appState.saveSettings()
-                        }
-                    )
+                        )
+                    }
                 }
             }
             
             Section("Create Custom Mode") {
-                TextField("Mode Name", text: $newModeName)
-                TextField("Description", text: $newModeDescription)
-                
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Mode Name").font(.caption).foregroundStyle(.secondary)
+                        TextField(TranscriptionMode.placeholderName, text: $newModeName)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Description").font(.caption).foregroundStyle(.secondary)
+                        TextField(TranscriptionMode.placeholderDescription, text: $newModeDescription)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    
+                    HStack(spacing: 16) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Example Input").font(.caption).foregroundStyle(.secondary)
-                            TextEditor(text: $newModeExampleInput)
+                            TextEditorCustom(text: $newModeExampleInput, placeholder: TranscriptionMode.placeholderExampleInput)
                                 .frame(height: 60)
-                                .font(.system(size: 11))
-                                .padding(4)
-                                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-                                .cornerRadius(4)
                         }
                         
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Example Output").font(.caption).foregroundStyle(.secondary)
-                            TextEditor(text: $newModeExampleOutput)
+                            TextEditorCustom(text: $newModeExampleOutput, placeholder: TranscriptionMode.placeholderExampleOutput)
                                 .frame(height: 60)
-                                .font(.system(size: 11))
-                                .padding(4)
-                                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-                                .cornerRadius(4)
                         }
                     }
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text("System Prompt (Instructions for AI)").font(.caption).foregroundStyle(.secondary)
-                        TextEditor(text: $newModePrompt)
+                        TextEditorCustom(text: $newModePrompt, placeholder: TranscriptionMode.placeholderPrompt, isMonospaced: true)
                             .frame(minHeight: 100)
-                            .font(.system(size: 12, design: .monospaced))
-                            .padding(4)
-                            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-                            .cornerRadius(4)
                     }
                     
                     Button {
@@ -366,15 +353,76 @@ struct SettingsView: View {
                         newModeExampleOutput = ""
                         newModePrompt = ""
                     } label: {
-                        Label("Save Custom Mode", systemImage: "plus.circle.fill")
+                        Label("Add Mode", systemImage: "plus.circle.fill")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .disabled(newModeName.isEmpty || newModePrompt.isEmpty)
-                    .padding(.top, 8)
                 }
                 .padding(.vertical, 8)
+            }
+        }
+    }
+
+    private var usageSection: some View {
+        Group {
+            Section("7-Day Usage Summary") {
+                let logs = appState.settings.usageLogs
+                let totalTokens = logs.reduce(0) { $0 + $1.totalTokens }
+                let totalCost = logs.reduce(0.0) { $0 + $1.estimatedCost }
+                
+                HStack(spacing: 40) {
+                    VStack(alignment: .leading) {
+                        Text("Total Tokens").font(.caption).foregroundStyle(.secondary)
+                        Text("\(totalTokens)").font(.title2).bold().foregroundStyle(SW.accent)
+                    }
+                    
+                    VStack(alignment: .leading) {
+                        Text("Est. Cost").font(.caption).foregroundStyle(.secondary)
+                        Text("$\(String(format: "%.4f", totalCost))").font(.title2).bold().foregroundStyle(.green)
+                    }
+                    
+                    Spacer()
+                    
+                    Button("Reset Logs") {
+                        appState.settings.usageLogs.removeAll()
+                        appState.saveSettings()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                .padding(.vertical, 8)
+            }
+            
+            Section("Recent Activity") {
+                if appState.settings.usageLogs.isEmpty {
+                    Text("No usage logs available.")
+                        .foregroundStyle(.secondary)
+                        .italic()
+                } else {
+                    List {
+                        ForEach(appState.settings.usageLogs.reversed()) { log in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(log.modeName).font(.system(size: 13, weight: .bold))
+                                    Text(log.date.formatted(date: .abbreviated, time: .shortened))
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                VStack(alignment: .trailing) {
+                                    Text("\(log.totalTokens) tokens").font(.system(size: 12, design: .monospaced))
+                                    Text(log.engine).font(.system(size: 10)).foregroundStyle(.secondary).italic()
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .frame(minHeight: 200)
+                }
             }
         }
     }
@@ -439,48 +487,136 @@ struct SettingsView: View {
 
 // MARK: - Helper Views
 
+struct AIConfigView: View {
+    @Binding var settings: AppSettings
+    var onSave: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            Toggle("Enable AI Refinement Globally", isOn: $settings.enablePostProcessing)
+                .onChange(of: settings.enablePostProcessing) {
+                    settings.selectedModeName = settings.validatedModeName(currentName: settings.selectedModeName)
+                    onSave()
+                }
+            
+            Picker("AI Engine", selection: $settings.postProcessingEngine) {
+                ForEach(PostProcessingEngine.allCases, id: \.self) { engine in
+                    Text(engine.rawValue).tag(engine)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(!settings.enablePostProcessing)
+            .onChange(of: settings.postProcessingEngine) {
+                settings.selectedModeName = settings.validatedModeName(currentName: settings.selectedModeName)
+                onSave()
+            }
+            
+            if settings.enablePostProcessing {
+                VStack(alignment: .leading, spacing: 8) {
+                    let isOpenAI = settings.postProcessingEngine == .openai
+                    Text(isOpenAI ? "OpenAI API Key" : "Perplexity API Key")
+                        .font(.caption).foregroundStyle(.secondary)
+                    
+                    HStack {
+                        SecureField("sk-...", text: isOpenAI ? $settings.apiKey : $settings.perplexityApiKey)
+                            .textFieldStyle(.roundedBorder)
+                            .onChange(of: settings.apiKey) {
+                                settings.selectedModeName = settings.validatedModeName(currentName: settings.selectedModeName)
+                                onSave()
+                            }
+                            .onChange(of: settings.perplexityApiKey) {
+                                settings.selectedModeName = settings.validatedModeName(currentName: settings.selectedModeName)
+                                onSave()
+                            }
+                        
+                        let currentMode = settings.allModes.first { $0.name == settings.selectedModeName } ?? .dictation
+                        if !settings.isModeEnabled(currentMode) && settings.selectedModeName != TranscriptionMode.dictation.name {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundStyle(.red)
+                                .font(.caption)
+                        }
+                    }
+                    
+                    Text(settings.postProcessingEngine == .perplexity 
+                         ? "Perplexity Sonar: Best for intelligent grammar/flow." 
+                         : "OpenAI GPT: Reliable formatting and structuring.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 4)
+            }
+        }
+    }
+}
+
 struct ModeCard: View {
     let mode: TranscriptionMode
     let isSelected: Bool
+    let isEnabled: Bool
     let onSelect: () -> Void
     let onDelete: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Label(mode.name, systemImage: mode.icon)
-                    .font(.headline)
-                    .foregroundStyle(isSelected ? SW.accent : .primary)
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Label(mode.name, systemImage: mode.icon)
+                            .font(.headline)
+                            .foregroundStyle(isSelected ? SW.accent : (isEnabled ? .primary : .secondary))
+                        
+                        if !isEnabled {
+                            Image(systemName: "lock.fill")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    
+                    Text(mode.description)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    if !isEnabled {
+                        Text("Requires API Key & AI Refinement Enabled")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.orange.opacity(0.8))
+                            .padding(.top, 2)
+                    }
+                }
                 
                 Spacer()
                 
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(SW.accent)
-                }
-                
-                if let onDelete = onDelete {
-                    Button(action: onDelete) {
-                        Image(systemName: "trash")
-                            .foregroundStyle(.secondary)
+                VStack(alignment: .trailing, spacing: 8) {
+                    Toggle("", isOn: Binding(
+                        get: { isSelected },
+                        set: { if $0 && isEnabled { onSelect() } }
+                    ))
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+                    .disabled(!isEnabled)
+                    
+                    if let onDelete = onDelete {
+                        Button(action: onDelete) {
+                            Image(systemName: "trash")
+                                .foregroundStyle(.red.opacity(0.7))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.leading, 8)
                 }
             }
-            
-            Text(mode.description)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            .opacity(isEnabled ? 1.0 : 0.6)
             
             VStack(alignment: .leading, spacing: 10) {
                 ExampleBox(title: "Input:", text: mode.exampleInput, icon: "mic")
                 ExampleBox(title: "Output:", text: mode.exampleOutput, icon: "sparkles", isOutput: true)
             }
+            .opacity(isEnabled || mode.name == TranscriptionMode.dictation.name ? 1.0 : 0.4)
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
-        .onTapGesture(perform: onSelect)
+        .onTapGesture {
+            if isEnabled { onSelect() }
+        }
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
 }
@@ -514,5 +650,35 @@ struct ExampleBox: View {
                 .cornerRadius(6)
                 .foregroundStyle(.primary)
         }
+    }
+}
+
+struct TextEditorCustom: View {
+    @Binding var text: String
+    let placeholder: String
+    var isMonospaced: Bool = false
+    
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            if text.isEmpty {
+                Text(placeholder)
+                    .font(isMonospaced ? .system(size: 12, design: .monospaced) : .system(size: 11))
+                    .foregroundStyle(.secondary.opacity(0.5))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
+            }
+            
+            TextEditor(text: $text)
+                .font(isMonospaced ? .system(size: 12, design: .monospaced) : .system(size: 11))
+                .scrollContentBackground(.hidden)
+                .background(.clear)
+                .padding(4)
+        }
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+        .cornerRadius(6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+        )
     }
 }

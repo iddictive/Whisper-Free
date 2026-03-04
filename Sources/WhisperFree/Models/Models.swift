@@ -96,8 +96,7 @@ struct UsageLog: Codable, Identifiable {
     let estimatedCost: Double
     
     // Estimates based on gpt-4o-mini ($0.15 / 1M input, $0.60 / 1M output)
-    static func estimateCost(prompt: Int, completion: Int, engine: TranscriptionEngineType) -> Double {
-        if engine == .local { return 0.0 }
+    static func estimateCost(prompt: Int, completion: Int, engine: PostProcessingEngine) -> Double {
         let pRate = 0.15 / 1_000_000.0
         let cRate = 0.60 / 1_000_000.0
         return (Double(prompt) * pRate) + (Double(completion) * cRate)
@@ -380,6 +379,29 @@ struct AppSettings: Codable {
 
     var selectedMode: TranscriptionMode {
         allModes.first { $0.name == selectedModeName } ?? .dictation
+    }
+
+    func isModeEnabled(_ mode: TranscriptionMode) -> Bool {
+        // Dictation is the fallback, always technically "on" but skips AI if no key
+        if mode.name == TranscriptionMode.dictation.name { return true }
+        
+        // AI modes require global enablement AND keys
+        guard enablePostProcessing else { return false }
+        
+        switch postProcessingEngine {
+        case .openai:
+            return !apiKey.trimmingCharacters(in: .whitespaces).isEmpty
+        case .perplexity:
+            return !perplexityApiKey.trimmingCharacters(in: .whitespaces).isEmpty
+        }
+    }
+
+    func validatedModeName(currentName: String) -> String {
+        let currentMode = allModes.first { $0.name == currentName } ?? .dictation
+        if !isModeEnabled(currentMode) {
+            return TranscriptionMode.dictation.name
+        }
+        return currentName
     }
 
     // Supported languages for Whisper

@@ -83,11 +83,9 @@ struct RecordingOverlayContent: View {
                     .foregroundStyle(.white)
             } else if appState.state == .processing {
                 HStack(spacing: 8) {
-                    Image(systemName: "arrow.trianglehead.2.clockwise")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .rotationEffect(.degrees(appState.state == .processing ? 360 : 0))
-                        .animation(.linear(duration: 1.0).repeatForever(autoreverses: false), value: appState.state)
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: 8))
+                        .foregroundStyle(.orange)
                     Text(appState.processingStage.rawValue)
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(.white)

@@ -236,13 +236,28 @@ final class AppState: ObservableObject {
                     return
                 }
 
-                // 2. Post-process (if API key available)
-                processingStage = .postProcessing
+                // 2. Post-process (if enabled)
                 var processedText = rawText
-                if !settings.apiKey.isEmpty {
+                var usage: UsageLog? = nil
+                
+                if settings.enablePostProcessing && !settings.selectedMode.systemPrompt.isEmpty {
+                    processingStage = .postProcessing
                     do {
                         let processor = PostProcessor(settings: settings)
-                        processedText = try await processor.process(text: rawText, mode: settings.selectedMode)
+                        let result = try await processor.process(text: rawText, mode: settings.selectedMode)
+                        processedText = result.text
+                        
+                        // Create usage log
+                        let engine = settings.postProcessingEngine
+                        usage = UsageLog(
+                            date: Date(),
+                            modeName: settings.selectedMode.name,
+                            engine: engine.rawValue,
+                            promptTokens: result.promptTokens,
+                            completionTokens: result.completionTokens,
+                            totalTokens: result.promptTokens + result.completionTokens,
+                            estimatedCost: UsageLog.estimateCost(prompt: result.promptTokens, completion: result.completionTokens, engine: engine)
+                        )
                     } catch {
                         // Log error but STILL use raw text as fallback
                         self.lastError = "AI refinement failed: \(error.localizedDescription). Using raw transcription."
@@ -263,16 +278,24 @@ final class AppState: ObservableObject {
                     AutoTyper.insert(text: processedText, method: settings.insertionMethod)
                 }
 
-                // 7. Save to history
+                // 7. Save to history & usage logs
                 let entry = TranscriptionHistoryEntry(
                     rawText: rawText,
                     processedText: processedText,
                     modeName: settings.selectedMode.name,
                     duration: recordingDuration,
-                    engineUsed: settings.engineType.rawValue
+                    engineUsed: settings.engineType.rawValue,
+                    usage: usage
                 )
                 Storage.shared.addTranscriptionHistoryEntry(entry)
                 history.insert(entry, at: 0)
+                
+                if let u = usage {
+                    settings.usageLogs.append(u)
+                    cleanupOldLogs()
+                }
+                saveSettings()
+
                 lastTranscription = processedText
 
                 state = .idle
@@ -309,7 +332,8 @@ final class AppState: ObservableObject {
     func clearHistory() {
         Storage.shared.clearHistory()
         history.removeAll()
-    
+    }
+
     private func cleanupOldLogs() {
         let sevenDaysAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
         settings.usageLogs.removeAll { $0.date < sevenDaysAgo }

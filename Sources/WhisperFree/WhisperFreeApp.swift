@@ -59,6 +59,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
     }
+    
+    func applicationWillTerminate(_ notification: Notification) {
+        // Release all modifiers to prevent "stuck" keys if app crashes or closes during typing
+        AutoTyper.releaseModifiers()
+    }
 
     func showSetupWizard() {
         if let existing = setupWindowController?.window, existing.isVisible {
@@ -83,6 +88,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         win.backgroundColor = NSColor(red: 0.07, green: 0.07, blue: 0.12, alpha: 1.0)
         win.setContentSize(NSSize(width: 580, height: 600))
         win.center()
+        win.level = .floating
+        win.hidesOnDeactivate = false
         win.delegate = self
 
         setupWindowController = NSWindowController(window: win)

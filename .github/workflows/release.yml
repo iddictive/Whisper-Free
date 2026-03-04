@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '5.9'
+
+      - name: Build App
+        run: |
+          swift build -c release
+          mkdir -p WhisperFree.app/Contents/MacOS
+          mkdir -p WhisperFree.app/Contents/Resources
+          cp .build/release/WhisperFree WhisperFree.app/Contents/MacOS/
+          cp Sources/WhisperFree/Resources/Info.plist WhisperFree.app/Contents/
+          if [ -f Sources/WhisperFree/Resources/AppIcon.icns ]; then
+            cp Sources/WhisperFree/Resources/AppIcon.icns WhisperFree.app/Contents/Resources/
+          fi
+
+      - name: Create DMG
+        run: |
+          ./create_dmg.sh
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            WhisperFree.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

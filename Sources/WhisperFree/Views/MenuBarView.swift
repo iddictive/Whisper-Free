@@ -49,24 +49,33 @@ struct MenuBarView: View {
                 HStack(spacing: 6) {
                     ForEach(appState.settings.allModes) { mode in
                         let isActive = appState.settings.selectedModeName == mode.name
+                        let isEnabled = appState.settings.isModeEnabled(mode)
+                        
                         Button {
-                            appState.settings.selectedModeName = mode.name
-                            appState.saveSettings()
+                            if isEnabled {
+                                appState.settings.selectedModeName = mode.name
+                                appState.saveSettings()
+                            }
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: mode.icon)
                                     .font(.system(size: 10))
                                 Text(mode.name)
                                     .font(.system(size: 11, weight: .medium))
+                                
+                                if !isEnabled {
+                                    Image(systemName: "lock.fill")
+                                        .font(.system(size: 8))
+                                }
                             }
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
                             .background(
                                 isActive
                                     ? Color.accentColor.opacity(0.12)
-                                    : Color.primary.opacity(0.04)
+                                    : (isEnabled ? Color.primary.opacity(0.04) : Color.primary.opacity(0.02))
                             )
-                            .foregroundStyle(isActive ? .primary : .secondary)
+                            .foregroundStyle(isActive ? AnyShapeStyle(.primary) : (isEnabled ? AnyShapeStyle(.secondary) : AnyShapeStyle(.secondary.opacity(0.4))))
                             .clipShape(Capsule())
                             .overlay(
                                 Capsule().strokeBorder(
@@ -76,6 +85,7 @@ struct MenuBarView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .disabled(!isEnabled)
                     }
                 }
                 .padding(.horizontal, 16)

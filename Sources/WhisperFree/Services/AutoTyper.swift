@@ -39,18 +39,40 @@ final class AutoTyper {
         let source = CGEventSource(stateID: .combinedSessionState)
         
         // Replace newlines with carriage returns. 
-        // Many macOS apps treat \r as "newline without submitting" in text fields,
-        // which helps avoid the "only first paragraph" or "premature send" issues.
+        // Many macOS apps treat \r as "newline without submitting" in text fields.
         let correctedText = text.replacingOccurrences(of: "\n", with: "\r")
         
-        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
-        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
+        // For better stability with virtual events, we post characters one by one or in small chunks.
+        // Also ensure no modifiers are accidentally active from previous events.
+        for char in correctedText.utf16 {
+            let utf16Chars = [char]
+            
+            let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true)
+            let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
+            
+            keyDown?.keyboardSetUnicodeString(stringLength: utf16Chars.count, unicodeString: utf16Chars)
+            keyUp?.keyboardSetUnicodeString(stringLength: utf16Chars.count, unicodeString: utf16Chars)
+            
+            // Post with a tiny delay if needed, but usually back-to-back is fine for unicode
+            keyDown?.post(tap: .cgAnnotatedSessionEventTap)
+            keyUp?.post(tap: .cgAnnotatedSessionEventTap)
+        }
+    }
+
+    /// Emergency release of all major modifier keys
+    static func releaseModifiers() {
+        let source = CGEventSource(stateID: .combinedSessionState)
+        let keys: [Int] = [
+            0x38, // Shift
+            0x3B, // Control
+            0x3A, // Option
+            0x37  // Command
+        ]
         
-        let utf16Chars = Array(correctedText.utf16)
-        keyDown?.keyboardSetUnicodeString(stringLength: utf16Chars.count, unicodeString: utf16Chars)
-        
-        keyDown?.post(tap: .cgAnnotatedSessionEventTap)
-        keyUp?.post(tap: .cgAnnotatedSessionEventTap)
+        for key in keys {
+            let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(key), keyDown: false)
+            keyUp?.post(tap: .cgAnnotatedSessionEventTap)
+        }
     }
 }
 
