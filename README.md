@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icon.png" alt="Whisper Free" width="180">
+</p>
+
 # Whisper Free
 
 **[Русский](#русский)** · **[English](#english)**
