@@ -1,29 +1,47 @@
-# Build
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# --- Swift / Build ---
 .build/
 DerivedData/
-
-# SPM
-.swiftpm/
-Package.resolved
-
-# Xcode
-*.xcodeproj
-*.xcworkspace
-xcuserdata/
-
-# App bundle (built artifact)
 *.app
+*.dmg
+*.pkg
 
-# macOS
-.DS_Store
-._*
+# --- SPM ---
+.swiftpm/
+# Package.resolved
 
-# IDE
+# --- Xcode ---
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcworkspace/contents.xcworkspacedata
+*.xcuserstate
+*.xcuserdata/
+
+# --- IDE (VSCode / Cursor) ---
+.vscode/
+.cursor/
+.history/
 *.swp
 *.swo
 *~
 
-# Test files
-test*.m4a
-test*.swift
+# --- Project Specific ---
 .agents/
+.gemini/
+scripts/pad_icon.swift
+scripts/fix_icon_padding.sh
+
+# --- Logs & Temp ---
+*.log
+*.tmp
+crash_report_*.txt
+whisper_input_*.wav
