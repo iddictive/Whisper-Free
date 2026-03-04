@@ -2,21 +2,21 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>LSUIElement</key>
-    <true/>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>Whisper Free needs microphone access to record your voice for transcription.</string>
-    <key>CFBundleName</key>
-    <string>WhisperFree</string>
-    <key>CFBundleDisplayName</key>
-    <string>Whisper Free</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.whisperfree.app</string>
-    <key>CFBundleVersion</key>
-    <string>2.0.0</string>
-    <key>CFBundleShortVersionString</key>
-    <string>2.0.0</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon.icns</string>
+	<key>CFBundleDisplayName</key>
+	<string>Whisper Free</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon.icns</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.whisperfree.app</string>
+	<key>CFBundleName</key>
+	<string>WhisperFree</string>
+	<key>CFBundleShortVersionString</key>
+	<string>2.0.28</string>
+	<key>CFBundleVersion</key>
+	<string>2.0.28</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Whisper Free needs microphone access to record your voice for transcription.</string>
 </dict>
 </plist>

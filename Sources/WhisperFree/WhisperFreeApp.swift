@@ -1,200 +1,18 @@
 import SwiftUI
-import Combine
 import AppKit
-
-// MARK: - App Delegate
-
-@MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    /// Static reference so views can access the delegate directly
-    static var shared: AppDelegate!
-
-    private var setupWindowController: NSWindowController?
-    private var settingsWindowController: NSWindowController?
-    private var historyWindowController: NSWindowController?
-    private var overlayController = OverlayWindowController()
-    private var cancellables = Set<AnyCancellable>()
-
-    private var appState: AppState { AppState.shared }
-
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        AppDelegate.shared = self
-        
-        // Single instance check
-        let currentPID = ProcessInfo.processInfo.processIdentifier
-        let runningApps = NSWorkspace.shared.runningApplications
-        
-        let otherInstances = runningApps.filter { app in
-            // Must have same bundle ID (if exists) or same process name, and NOT be current PID
-            let matchingID = app.bundleIdentifier == Bundle.main.bundleIdentifier && app.bundleIdentifier != nil
-            let matchingName = app.localizedName == "WhisperFree"
-            return (matchingID || matchingName) && app.processIdentifier != currentPID
-        }
-        
-        if !otherInstances.isEmpty {
-            print("⚠️ Another instance of WhisperFree is already running (PIDs: \(otherInstances.map { $0.processIdentifier })). Exiting.")
-            NSApp.terminate(nil)
-            return
-        }
-
-        NSApp.setActivationPolicy(.accessory)
-
-        // Overlay observer
-        appState.$showOverlayWindow
-            .receive(on: RunLoop.main)
-            .sink { [weak self] show in
-                guard let self else { return }
-                if show {
-                    self.overlayController.show(appState: self.appState)
-                } else {
-                    self.overlayController.hide()
-                }
-            }
-            .store(in: &cancellables)
-
-        // Auto-open setup wizard on first launch
-        if !appState.settings.setupCompleted {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.showSetupWizard()
-            }
-        } else {
-            // Check for updates if setup is done
-            GitHubUpdater.shared.checkForUpdates()
-        }
-    }
-    
-    func applicationWillTerminate(_ notification: Notification) {
-        // Release all modifiers to prevent "stuck" keys if app crashes or closes during typing
-        AutoTyper.releaseModifiers()
-    }
-
-    func showSetupWizard() {
-        if let existing = setupWindowController?.window, existing.isVisible {
-            activateForWindow(existing)
-            return
-        }
-
-        let view = SetupWizardView(modelManager: appState.modelManager) { [weak self] in
-            self?.setupWindowController?.close()
-            self?.setupWindowController = nil
-            self?.deactivateIfNoWindows()
-        }
-        .environmentObject(appState)
-
-        let hc = NSHostingController(rootView: view)
-        let win = NSWindow(contentViewController: hc)
-        win.title = "Whisper Free Setup"
-        win.styleMask = [.titled, .closable, .fullSizeContentView]
-        win.titlebarAppearsTransparent = true
-        win.titleVisibility = .hidden
-        win.isMovableByWindowBackground = true
-        win.backgroundColor = NSColor(red: 0.07, green: 0.07, blue: 0.12, alpha: 1.0)
-        win.setContentSize(NSSize(width: 580, height: 600))
-        win.center()
-        win.level = .floating
-        win.hidesOnDeactivate = false
-        win.delegate = self
-
-        setupWindowController = NSWindowController(window: win)
-        setupWindowController?.showWindow(nil)
-        activateForWindow(win)
-    }
-
-    func showSettings() {
-        if let existing = settingsWindowController?.window, existing.isVisible {
-            activateForWindow(existing)
-            return
-        }
-
-        let view = SettingsView()
-            .environmentObject(appState)
-
-        let hc = NSHostingController(rootView: view)
-        let win = NSWindow(contentViewController: hc)
-        win.title = "Whisper Free Settings"
-        win.styleMask = [.titled, .closable, .resizable, .miniaturizable]
-        win.setContentSize(NSSize(width: 950, height: 700))
-        win.minSize = NSSize(width: 800, height: 600)
-        win.center()
-        win.delegate = self
-
-        settingsWindowController = NSWindowController(window: win)
-        settingsWindowController?.showWindow(nil)
-        activateForWindow(win)
-    }
-
-    func showHistory() {
-        if let existing = historyWindowController?.window, existing.isVisible {
-            activateForWindow(existing)
-            return
-        }
-
-        let view = HistoryView()
-            .environmentObject(appState)
-            .frame(minWidth: 480, minHeight: 400)
-
-        let hc = NSHostingController(rootView: view)
-        let win = NSWindow(contentViewController: hc)
-        win.title = "Transcription History"
-        win.styleMask = [.titled, .closable, .resizable]
-        win.setContentSize(NSSize(width: 520, height: 460))
-        win.center()
-        win.delegate = self
-
-        historyWindowController = NSWindowController(window: win)
-        historyWindowController?.showWindow(nil)
-        activateForWindow(win)
-    }
-
-    // MARK: - Activation Policy Management
-
-    /// Bring a specific window to front without causing flicker.
-    /// Only switches to .regular once; subsequent calls just focus the window.
-    private func activateForWindow(_ window: NSWindow) {
-        if NSApp.activationPolicy() != .regular {
-            NSApp.setActivationPolicy(.regular)
-        }
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    /// When all managed windows are closed, hide the app from Cmd-Tab
-    private func deactivateIfNoWindows() {
-        let hasSettings = settingsWindowController?.window?.isVisible == true
-        let hasHistory = historyWindowController?.window?.isVisible == true
-        let hasSetup = setupWindowController?.window?.isVisible == true
-
-        if !hasSettings && !hasHistory && !hasSetup {
-            NSApp.setActivationPolicy(.accessory)
-        }
-    }
-}
-
-extension AppDelegate: NSWindowDelegate {
-    func windowWillClose(_ notification: Notification) {
-        guard let window = notification.object as? NSWindow else { return }
-        if window === settingsWindowController?.window {
-            settingsWindowController = nil
-        } else if window === historyWindowController?.window {
-            historyWindowController = nil
-        } else if window === setupWindowController?.window {
-            setupWindowController = nil
-        }
-
-        // Return to accessory mode (invisible in Cmd-Tab) when all windows are closed
-        DispatchQueue.main.async { [weak self] in
-            self?.deactivateIfNoWindows()
-        }
-    }
-}
-
-// MARK: - Main App
+import Combine
+import Foundation
 
 @main
 struct WhisperFreeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    @ObservedObject private var appState = AppState.shared
-
+    @StateObject private var appState = AppState.shared
+    
+    init() {
+        // Ensure app can run without dock icon but with menu bar
+        NSApp.setActivationPolicy(.accessory)
+    }
+    
     var body: some Scene {
         MenuBarExtra {
             MenuBarView()
@@ -205,6 +23,155 @@ struct WhisperFreeApp: App {
         .menuBarExtraStyle(.window)
     }
 }
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
+    static private(set) var shared: AppDelegate?
+    
+    private var overlayController = OverlayWindowController()
+    private var setupWizardController: SetupWizardWindowController?
+    private var settingsWindowController: SettingsWindowController?
+    private var historyWindowController: HistoryWindowController?
+    
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        AppDelegate.shared = self
+        
+        // Show setup wizard if needed
+        if !AppState.shared.settings.setupCompleted {
+            showSetupWizard()
+        }
+    }
+    
+    func showSetupWizard() {
+        if setupWizardController == nil {
+            setupWizardController = SetupWizardWindowController()
+        }
+        setupWizardController?.show()
+    }
+    
+    func showSettings() {
+        if settingsWindowController == nil {
+            settingsWindowController = SettingsWindowController()
+        }
+        settingsWindowController?.show()
+    }
+    
+    func showHistory() {
+        if historyWindowController == nil {
+            historyWindowController = HistoryWindowController()
+        }
+        historyWindowController?.show()
+    }
+}
+
+// MARK: - Window Controllers
+
+@MainActor
+final class SetupWizardWindowController: NSObject {
+    private var window: NSWindow?
+    
+    func show() {
+        if window != nil {
+            window?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        
+        let view = SetupWizardView(
+            modelManager: AppState.shared.modelManager,
+            onComplete: { [weak self] in
+                self?.close()
+            }
+        ).environmentObject(AppState.shared)
+        
+        let hostingView = NSHostingView(rootView: view)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 580, height: 600),
+            styleMask: [.titled, .closable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.center()
+        window.contentView = hostingView
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.isMovableByWindowBackground = true
+        window.isReleasedWhenClosed = false
+        window.backgroundColor = .clear
+        
+        self.window = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    func close() {
+        window?.close()
+        window = nil
+    }
+}
+
+@MainActor
+final class SettingsWindowController: NSObject {
+    private var window: NSWindow?
+    
+    func show() {
+        if window != nil {
+            window?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        
+        let view = SettingsView().environmentObject(AppState.shared)
+        let hostingView = NSHostingView(rootView: view)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 550),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.center()
+        window.contentView = hostingView
+        window.title = "WhisperFree Settings"
+        window.titleVisibility = .visible
+        window.isReleasedWhenClosed = false
+        
+        self.window = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+@MainActor
+final class HistoryWindowController: NSObject {
+    private var window: NSWindow?
+    
+    func show() {
+        if window != nil {
+            window?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        
+        let view = HistoryView().environmentObject(AppState.shared)
+        let hostingView = NSHostingView(rootView: view)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.center()
+        window.contentView = hostingView
+        window.title = "Transcription History"
+        window.isReleasedWhenClosed = false
+        
+        self.window = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+// MARK: - Menu Bar Icon
 
 struct MenuBarIconView: View {
     let state: AppRecordingState
@@ -217,7 +184,7 @@ struct MenuBarIconView: View {
                 Image(nsImage: createMenuImage(from: icon))
                     .font(.system(size: 14, weight: .medium))
             } else {
-                // Fallback (should not happen in production bundle)
+                // Fallback
                 Image(systemName: "microphone.fill")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(state == .recording ? .red : .primary)
@@ -242,12 +209,12 @@ struct MenuBarIconView: View {
                     .frame(width: 6.5, height: 6.5)
                 
                 Circle()
-                    .fill(color ?? Color.clear)
+                    .fill(color ?? Color.green) // Spoof uses green for active/running
                     .frame(width: 4.5, height: 4.5)
             }
-            .offset(x: 6.8, y: 6.5)
-            // Pulse or Blink depending on state
-            .opacity(color == nil ? 0 : (state == .recording ? 1.0 : (blink ? 1.0 : 0.3)))
+            .offset(x: 6.0, y: 6.0)
+            // Pulse/Blink only during processing
+            .opacity(state == .processing || state == .typing ? (blink ? 1.0 : 0.4) : 1.0)
         }
         .onAppear {
             startAnimation()
@@ -269,7 +236,7 @@ struct MenuBarIconView: View {
         image.isTemplate = false // Keep original colors
         return image
     }
-    
+
     private func startAnimation() {
         if state == .processing || state == .typing {
             withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
