@@ -5,10 +5,13 @@
 cd "$(dirname "$0")"
 APP_NAME="WhisperFree"
 BUNDLE_NAME="WhisperFree.app"
-VERSION="2.0"
-BUILD_PATH=".build/arm64-apple-macosx/release/$APP_NAME"
-INFO_PLIST="Sources/WhisperFree/Resources/Info.plist"
-ICON_FILE="Sources/WhisperFree/Resources/AppIcon.icns"
+# 2. Versioning (Spoof Style)
+COMMIT_COUNT=$(git rev-list --count HEAD)
+VERSION="2.0.$COMMIT_COUNT"
+
+# Update Info.plist
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$INFO_PLIST"
 
 echo "🚀 Starting deployment v$VERSION..."
 

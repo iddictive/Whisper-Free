@@ -11,14 +11,26 @@ jobs:
   build:
     name: Build and Release
     runs-on: macos-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Swift
         uses: swift-actions/setup-swift@v2
         with:
           swift-version: '5.9'
+
+      - name: Calculate Version
+        id: versioning
+        run: |
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          APP_VERSION="2.0.$COMMIT_COUNT"
+          echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
+          echo "VERSION=$APP_VERSION" >> $GITHUB_OUTPUT
 
       - name: Build App
         run: |
@@ -27,6 +39,11 @@ jobs:
           mkdir -p WhisperFree.app/Contents/Resources
           cp .build/release/WhisperFree WhisperFree.app/Contents/MacOS/
           cp Sources/WhisperFree/Resources/Info.plist WhisperFree.app/Contents/
+          
+          # Inject version into Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ env.APP_VERSION }}" "WhisperFree.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ env.APP_VERSION }}" "WhisperFree.app/Contents/Info.plist"
+          
           if [ -f Sources/WhisperFree/Resources/AppIcon.icns ]; then
             cp Sources/WhisperFree/Resources/AppIcon.icns WhisperFree.app/Contents/Resources/
           fi
@@ -38,10 +55,11 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v2.0-{0}', github.run_number) }}
+          tag_name: v${{ env.APP_VERSION }}
+          name: WhisperFree v${{ env.APP_VERSION }}
           files: |
             WhisperFree.dmg
           draft: false
-          prerelease: ${{ github.ref_type != 'tag' }}
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
