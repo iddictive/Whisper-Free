@@ -15,9 +15,16 @@ VERSION="2.0.$COMMIT_COUNT"
 echo "🔢 Version: $VERSION (commits: $COMMIT_COUNT)"
 
 # Update Info.plist before build
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSION" "$INFO_PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$INFO_PLIST"
-/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable $APP_NAME" "$INFO_PLIST"
+function update_plist() {
+    local key=$1
+    local value=$2
+    /usr/libexec/PlistBuddy -c "Set :$key $value" "$INFO_PLIST" 2>/dev/null || \
+    /usr/libexec/PlistBuddy -c "Add :$key string $value" "$INFO_PLIST"
+}
+
+update_plist "CFBundleVersion" "$VERSION"
+update_plist "CFBundleShortVersionString" "$VERSION"
+update_plist "CFBundleExecutable" "$APP_NAME"
 
 echo "🚀 Starting deployment v$VERSION..."
 
