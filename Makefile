@@ -1,8 +1,8 @@
 .PHONY: install build run clean app
 
-# One-click install (dependencies + build + app bundle)
+# One-click install (build + launch)
 install:
-	@./install.sh
+	@bash deploy.command
 
 # Build release
 build:

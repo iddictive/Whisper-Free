@@ -207,38 +207,71 @@ struct WhisperFreeApp: App {
 }
 
 struct MenuBarIconView: View {
-    let state: AppState.State
-    @State private var blink = true
+    let state: AppRecordingState
+    @State private var blink = false
     
     var body: some View {
         ZStack {
-            Image(systemName: "microphone.fill")
-                .font(.system(size: 14, weight: .medium))
+            // Main App Icon (Spoof Style)
+            if let icon = NSApp.applicationIconImage {
+                Image(nsImage: createMenuImage(from: icon))
+                    .font(.system(size: 14, weight: .medium))
+            } else {
+                // Fallback (should not happen in production bundle)
+                Image(systemName: "microphone.fill")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(state == .recording ? .red : .primary)
+            }
             
+            // "Flame/Lightning" indicator for AI activity (Sparkle)
+            if state == .processing {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.orange)
+                    .offset(x: -8, y: -4)
+                    .scaleEffect(blink ? 1.2 : 0.8)
+                    .opacity(blink ? 1.0 : 0.4)
+            }
+            
+            // Status Dot Overlay (Spoof Style)
             if let color = statusColor {
                 Circle()
                     .fill(color)
-                    .frame(width: 5, height: 5)
+                    .frame(width: 5.0, height: 5.0)
                     .overlay(Circle().stroke(Color.black, lineWidth: 0.5))
-                    .offset(x: 6, y: 5)
-                    .opacity(state == .processing && !blink ? 0.3 : 1.0)
+                    .offset(x: 6.5, y: 5.5)
+                    // Pulse or Blink depending on state
+                    .opacity((state == .processing || state == .typing) && !blink ? 0.4 : 1.0)
             }
         }
         .onAppear {
-            if state == .processing {
-                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                    blink.toggle()
-                }
-            }
+            startAnimation()
         }
-        .onChange(of: state) { _, newState in
-            if newState == .processing {
-                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                    blink = false
-                }
-            } else {
+        .onChange(of: state) { _, _ in
+            startAnimation()
+        }
+    }
+    
+    private func createMenuImage(from icon: NSImage) -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        icon.draw(in: NSRect(origin: .zero, size: size), 
+                 from: .zero, 
+                 operation: .sourceOver, 
+                 fraction: 1.0)
+        image.unlockFocus()
+        image.isTemplate = false // Keep original colors
+        return image
+    }
+    
+    private func startAnimation() {
+        if state == .processing || state == .typing {
+            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
                 blink = true
             }
+        } else {
+            blink = false
         }
     }
     

@@ -89,7 +89,7 @@ final class AppState: ObservableObject {
     private func setupHotkey() {
         hotkeyManager.config = settings.hotkeyConfig
         hotkeyManager.start(
-            promptUser: settings.setupCompleted,
+            promptUser: false, // Don't prompt automatically on launch, user triggers via Settings
             onKeyDown: { [weak self] in self?.handleKeyDown() },
             onKeyUp: { [weak self] in self?.handleKeyUp() }
         )

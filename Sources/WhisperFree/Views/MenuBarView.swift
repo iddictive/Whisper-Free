@@ -75,7 +75,7 @@ struct MenuBarView: View {
                                     ? Color.accentColor.opacity(0.12)
                                     : (isEnabled ? Color.primary.opacity(0.04) : Color.primary.opacity(0.02))
                             )
-                            .foregroundStyle(isActive ? AnyShapeStyle(.primary) : (isEnabled ? AnyShapeStyle(.secondary) : AnyShapeStyle(.secondary.opacity(0.4))))
+                            .foregroundStyle(isActive ? AnyShapeStyle(.primary) : (isEnabled ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.secondary.opacity(0.4))))
                             .clipShape(Capsule())
                             .overlay(
                                 Capsule().strokeBorder(

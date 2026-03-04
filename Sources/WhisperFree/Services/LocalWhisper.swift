@@ -4,7 +4,7 @@ import Foundation
 /// Local transcription using whisper.cpp CLI binary.
 /// Install via: `brew install whisper-cpp`
 /// Models are downloaded automatically by ModelManager to ~/Library/Application Support/WhisperFree/Models/
-final class LocalWhisper: TranscriptionEngine, Sendable {
+final class LocalWhisper: TranscriptionEngine, @unchecked Sendable {
     private let modelSize: LocalModelSize
 
     init(modelSize: LocalModelSize) {

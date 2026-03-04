@@ -206,12 +206,30 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.radioGroup)
-                .onChange(of: appState.settings.engineType) { oldValue, newValue in
+                .onChange(of: appState.settings.engineType) { _, newValue in
                     if newValue == .local && appState.settings.selectedModeName == TranscriptionMode.dictation.name {
-                        // Switch to next available mode if dictation is disabled for local
                         appState.settings.selectedModeName = TranscriptionMode.notes.name
                     }
+                    if newValue == .cloud && appState.settings.apiKey.isEmpty {
+                        // Optional warning or just let them add the key below
+                    }
                     appState.saveSettings()
+                }
+
+                if appState.settings.engineType == .cloud && appState.settings.apiKey.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("OpenAI API key required for Cloud engine")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                        Spacer()
+                        Button("Add Key") {
+                            selectedTab = "modes"
+                        }
+                        .buttonStyle(.link)
+                        .font(.caption)
+                    }
                 }
             }
 
@@ -299,17 +317,18 @@ struct SettingsView: View {
 
             ForEach(appState.settings.allModes) { mode in
                 // Disable dictation if local engine is enabled (User Request)
-                let isDisabled = mode.name == TranscriptionMode.dictation.name && appState.settings.engineType == .local
+                let isDictation = mode.name == TranscriptionMode.dictation.name
+                let isDisabledByEngine = isDictation && appState.settings.engineType == .local
+                let isLocked = !appState.settings.isModeEnabled(mode)
                 
-                if !isDisabled {
+                if !isDisabledByEngine {
                     Section {
-                        let isEnabled = appState.settings.isModeEnabled(mode)
                         ModeCard(
                             mode: mode,
                             isSelected: appState.settings.selectedModeName == mode.name,
-                            isEnabled: isEnabled,
+                            isEnabled: !isLocked,
                             onSelect: {
-                                if isEnabled {
+                                if !isLocked {
                                     appState.settings.selectedModeName = mode.name
                                     appState.saveSettings()
                                 }
@@ -537,6 +556,18 @@ struct AIConfigView: View {
             }
             
             if settings.enablePostProcessing {
+                let isOpenAI = settings.postProcessingEngine == .openai
+                let keyMissing = isOpenAI ? settings.apiKey.isEmpty : settings.perplexityApiKey.isEmpty
+                
+                if keyMissing {
+                    HStack {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .foregroundStyle(.red)
+                        Text("\(settings.postProcessingEngine.rawValue) key missing. AI modes are disabled.")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
                 VStack(alignment: .leading, spacing: 8) {
                     let isOpenAI = settings.postProcessingEngine == .openai
                     Text(isOpenAI ? "OpenAI API Key" : "Perplexity API Key")
