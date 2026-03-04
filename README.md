@@ -1,203 +1,88 @@
-<p align="left">
-  <img src="banner.png" alt="Whisper Free" width="600">
+<p align="center">
+  <img src="banner.png" alt="Whisper Free" width="800">
 </p>
 
-**[English](#english)** · **[Русский](#русский)**
+<p align="center">
+  <a href="#english">English</a> • <a href="#russian">Русский</a>
+</p>
 
 ---
 
 <a id="english"></a>
 
-## English
+## English 🇺🇸
 
-Free open-source alternative to [SuperWhisper](https://superwhisper.com/) for macOS.  
-Voice → text, locally via [whisper.cpp](https://github.com/ggerganov/whisper.cpp) or via OpenAI Whisper API. Result is automatically inserted into the active application.
+### Free Professional macOS GUI for local Voice-to-Text — No Subscriptions, 100% Privacy
 
-### What it does
+**Whisper Free** is a hyper-fast, high-performance macOS application designed to transcribe your voice to text instantly using OpenAI's Whisper models.
 
-- Lives in the menu bar, triggered by a global hotkey (default `⌥ Space`)
-- Transcribes speech locally (whisper.cpp, GPU/NPU) or via cloud (OpenAI)
-- Auto-inserts the result into the currently focused app (paste or direct typing)
-- 4 built-in modes: Dictation, Email, Code, Notes + custom modes
-- AI post-processing via OpenAI or Perplexity (formatting, cleanup)
-- Full transcription history
-- 18 languages supported (auto-detect or manual selection)
+> Love the convenience of AI dictation but hate paying monthly subscriptions for professional features? Whisper Free gives you the "SuperWhisper experience" for free, running locally on your Mac's GPU/NPU or via API.
+
+It is a **fully-featured SuperWhisper alternative** that puts privacy and speed first. No "marketing fluff," just raw performance.
+
+### Features
+- **Control**: Lives in the menu bar, triggered by a global hotkey (default `⌥ Space`).
+- **Transcription**: Local via [whisper.cpp](https://github.com/ggerganov/whisper.cpp) (GPU/NPU optimized) or cloud via OpenAI API.
+- **Workflow**: Results are automatically inserted into the active application via paste or direct typing.
+- **Smart Modes**: 4 built-in modes (Dictation, Email, Code, Notes) + create your own custom AI prompts.
+- **AI Refinement**: One-click post-processing via OpenAI or Perplexity to fix grammar and formatting.
+- **Global**: Supports 18 languages with auto-detection.
 
 ### System Requirements
+- **macOS**: 14.0 (Sonoma) or newer.
+- **Architecture**: **Apple Silicon (arm64)** required. Intel is not supported.
+- **RAM**: 8GB Minimum, 16GB+ recommended for large models.
 
-| Parameter | Minimum | Recommended |
-|---|---|---|
-| macOS | 14.0 (Sonoma) | 15.0+ |
-| Architecture | Apple Silicon (arm64) | Apple Silicon |
-| RAM | 8 GB | 16+ GB (for larger models) |
-| Disk | ~200 MB (app + base model) | ~3 GB (large model) |
-| Xcode CLI Tools | Required | — |
-| Homebrew | Required | — |
+### Setup
+1. **Download**: Get `WhisperFree.dmg` from [Releases](https://github.com/iddictive/Whisper-Free/releases).
+2. **Install**: Drag to `Applications`.
+3. **Permissions**: Grant **Accessibility** and **Microphone** access on first launch.
 
-> **Apple Silicon only.** Intel Macs are not supported — whisper.cpp is built for arm64.
-
-### Whisper Models
-
-| Model | Size | Quality | Speed | Min RAM |
-|---|---|---|---|---|
-| Tiny | ~75 MB | ★☆☆☆☆ | ⚡⚡⚡ | 8 GB |
-| Base | ~140 MB | ★★☆☆☆ | ⚡⚡⚡ | 8 GB |
-| Small | ~460 MB | ★★★☆☆ | ⚡⚡ | 8 GB |
-| Medium | ~1.5 GB | ★★★★☆ | ⚡⚡ | 16 GB |
-| Large v3 Turbo | ~1.6 GB | ★★★★☆ | ⚡⚡ | 16 GB |
-| Large v3 | ~3.1 GB | ★★★★★ | ⚡ | 32 GB |
-
-The model is auto-selected on first launch based on available RAM.  
-Can be changed in Settings.
-
-### Installation
-
-#### Option 1: Download DMG
-
-Download the latest `WhisperFree.dmg` from [Releases](https://github.com/iddictive/Whisper-Free/releases).
-
-#### Option 2: Build from source
-
+### Manual Build
 ```bash
 git clone https://github.com/iddictive/Whisper-Free.git
 cd Whisper-Free
 make install
 ```
-
-`make install` handles everything automatically:
-1. Checks macOS version and Xcode CLI Tools
-2. Installs Homebrew (if missing)
-3. Installs whisper-cpp
-4. Downloads the Base model (~140 MB)
-5. Builds the application
-6. Creates `WhisperFree.app`
-
-### Manual build
-
-```bash
-swift build -c release
-make app
-open WhisperFree.app
-```
-
-### First launch
-
-1. Grant **Accessibility** permission (System Settings → Privacy & Security → Accessibility)
-2. Grant **Microphone** permission
-3. For Cloud mode or AI post-processing — enter your OpenAI API key in Settings
-
-### Hotkeys
-
-| Action | Key |
-|---|---|
-| Record / stop | `⌥ Space` (configurable) |
-| Cancel recording | `Esc` |
-
-### Recording modes
-
-- **Hold** — hold the key, release to transcribe
-- **Toggle** — press to start, press again to stop
-- **Push to Talk** — hold for 300ms+, release to transcribe
-
-### License
-
-MIT
 
 ---
 
-<a id="русский"></a>
+<a id="russian"></a>
 
-## Русский
+## Русский 🇷🇺
 
-Бесплатная open-source альтернатива [SuperWhisper](https://superwhisper.com/) для macOS.  
-Голос → текст, локально через [whisper.cpp](https://github.com/ggerganov/whisper.cpp) или через OpenAI Whisper API. Результат автоматически вставляется в активное приложение.
+### Профессиональный GUI для локального распознавания речи на macOS — Без подписок, 100% приватно
 
-### Что это делает
+**Whisper Free** — сверхбыстрое и производительное приложение для macOS, которое мгновенно превращает ваш голос в текст, используя модели Whisper от OpenAI.
 
-- Живёт в menu bar, работает по горячей клавише (по умолчанию `⌥ Space`)
-- Распознаёт речь локально (whisper.cpp, GPU/NPU) или через облако (OpenAI)
-- Автоматически вставляет результат в текущее приложение (paste или прямой набор)
-- 4 встроенных режима: Dictation, Email, Code, Notes + пользовательские
-- AI-постобработка через OpenAI или Perplexity (форматирование, очистка)
-- История всех транскрипций
-- Поддержка 18 языков (авто-определение или ручной выбор)
+> Нравится удобство AI-диктовки, но не хочется платить ежемесячную подписку за "PRO"-функции? Whisper Free — это бесплатная альтернатива SuperWhisper, работающая локально на GPU/NPU вашего Mac или через API.
+
+Это **полнофункциональная замена SuperWhisper**, где в приоритете приватность и скорость. Минимум «маркетинговой воды», максимум производительности.
+
+### Возможности
+- **Управление**: Работает из Menu Bar по глобальной горячей клавише (по умолчанию `⌥ Space`).
+- **Транскрипция**: Локально через [whisper.cpp](https://github.com/ggerganov/whisper.cpp) (оптимизировано под Apple Silicon) или облако (OpenAI API).
+- **Интеграция**: Результат автоматически вставляется в активное приложение (вставка из буфера или прямая печать).
+- **Умные режимы**: 4 встроенных пресета (Диктовка, Email, Код, Заметки) + создание собственных AI-промптов.
+- **AI-коррекция**: Постобработка через OpenAI или Perplexity для исправления грамматики и оформления.
+- **Языки**: Поддержка 18 языков с автоопределением.
 
 ### Системные требования
-
-| Параметр | Минимум | Рекомендуется |
-|---|---|---|
-| macOS | 14.0 (Sonoma) | 15.0+ |
-| Архитектура | Apple Silicon (arm64) | Apple Silicon |
-| RAM | 8 GB | 16 GB+ (для больших моделей) |
-| Диск | ~200 MB (приложение + базовая модель) | ~3 GB (large модель) |
-| Xcode CLI Tools | Обязательно | — |
-| Homebrew | Обязательно | — |
-
-> **Apple Silicon only.** Intel Mac не поддерживается — whisper.cpp собирается под arm64.
-
-### Модели Whisper
-
-| Модель | Размер | Качество | Скорость | Мин. RAM |
-|---|---|---|---|---|
-| Tiny | ~75 MB | ★☆☆☆☆ | ⚡⚡⚡ | 8 GB |
-| Base | ~140 MB | ★★☆☆☆ | ⚡⚡⚡ | 8 GB |
-| Small | ~460 MB | ★★★☆☆ | ⚡⚡ | 8 GB |
-| Medium | ~1.5 GB | ★★★★☆ | ⚡⚡ | 16 GB |
-| Large v3 Turbo | ~1.6 GB | ★★★★☆ | ⚡⚡ | 16 GB |
-| Large v3 | ~3.1 GB | ★★★★★ | ⚡ | 32 GB |
-
-Модель выбирается автоматически при первом запуске в зависимости от доступной RAM.  
-Можно переключить в Settings.
+- **macOS**: 14.0 (Sonoma) или новее.
+- **Архитектура**: Только **Apple Silicon (arm64)**. Intel не поддерживается.
+- **RAM**: Минимум 8 ГБ, рекомендуется 16 ГБ+ для тяжелых моделей.
 
 ### Установка
+1. **Скачать**: `WhisperFree.dmg` со страницы [Релизов](https://github.com/iddictive/Whisper-Free/releases).
+2. **Установить**: Перетянуть в `Applications`.
+3. **Права**: На первом запуске разрешите доступ к **Accessibility** (Универсальный доступ) и **Микрофону**.
 
-#### Вариант 1: Скачать DMG
-
-Скачать `WhisperFree.dmg` со страницы [Releases](https://github.com/iddictive/Whisper-Free/releases).
-
-#### Вариант 2: Собрать из исходников
-
+### Сборка из исходников
 ```bash
 git clone https://github.com/iddictive/Whisper-Free.git
 cd Whisper-Free
 make install
 ```
 
-`make install` выполнит всё автоматически:
-1. Проверит macOS и Xcode CLI Tools
-2. Установит Homebrew (если нет)
-3. Установит whisper-cpp
-4. Скачает модель Base (~140 MB)
-5. Соберёт приложение
-6. Создаст `WhisperFree.app`
-
-### Ручная сборка
-
-```bash
-swift build -c release
-make app
-open WhisperFree.app
-```
-
-### Первый запуск
-
-1. Разрешить **Accessibility** (System Settings → Privacy & Security → Accessibility)
-2. Разрешить **Microphone**
-3. Если нужен Cloud режим или AI-постобработка — ввести OpenAI API key в Settings
-
-### Горячие клавиши
-
-| Действие | Клавиша |
-|---|---|
-| Запись / стоп | `⌥ Space` (настраивается) |
-| Отмена записи | `Esc` |
-
-### Режимы записи
-
-- **Hold** — удерживайте клавишу, отпустите для транскрипции
-- **Toggle** — нажмите для начала, нажмите снова для остановки
-- **Push to Talk** — удерживайте 300ms+, отпустите для транскрипции
-
-### Лицензия
-
-MIT
+---
+MIT License.
