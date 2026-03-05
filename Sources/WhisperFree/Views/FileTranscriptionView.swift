@@ -42,7 +42,7 @@ struct FileTranscriptionView: View {
                 
                 if isProcessing {
                     progressView
-                } else if let result = result {
+                } else if result != nil {
                     resultView
                 } else {
                     dropZoneView
@@ -51,7 +51,7 @@ struct FileTranscriptionView: View {
             
             errorOverlay
         }
-        .frame(minWidth: 420, minHeight: 480)
+        .frame(minWidth: 400, minHeight: 400)
         .fileImporter(
             isPresented: $showFilePicker,
             allowedContentTypes: [.audio, .video, .movie, .quickTimeMovie, .mpeg4Movie, .wav, .mp3, .aiff],
@@ -85,13 +85,13 @@ struct FileTranscriptionView: View {
                     .clipShape(Capsule())
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
     }
 
     private var configBar: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             // Mode Selection
             Menu {
                 ForEach(appState.settings.allModes) { mode in
@@ -110,8 +110,8 @@ struct FileTranscriptionView: View {
                         .font(.system(size: 8))
                 }
                 .font(.system(size: 11, weight: .medium))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
                 .background(Color.primary.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
@@ -135,13 +135,22 @@ struct FileTranscriptionView: View {
                         .font(.system(size: 8))
                 }
                 .font(.system(size: 11, weight: .medium))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
                 .background(Color.primary.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
+            
+            if appState.settings.engineType == .cloud {
+                Toggle(isOn: $appState.settings.enableSpeakerDiarization) {
+                    Text("Diarization")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .toggleStyle(.checkbox)
+                .padding(.leading, 4)
+            }
 
             Spacer()
             
@@ -152,11 +161,13 @@ struct FileTranscriptionView: View {
                 } label: {
                     Label("Local (whisper.cpp)", systemImage: "cpu")
                 }
+                
                 Button {
                     appState.settings.engineType = .cloud
                 } label: {
                     Label("Cloud (OpenAI)", systemImage: "cloud.fill")
                 }
+                .disabled(appState.settings.apiKey.trimmingCharacters(in: .whitespaces).isEmpty)
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: appState.settings.engineType == .cloud ? "cloud.fill" : "cpu")
@@ -165,16 +176,16 @@ struct FileTranscriptionView: View {
                         .font(.system(size: 8))
                 }
                 .font(.system(size: 11, weight: .medium))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
                 .background(Color.primary.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
         .background(Color.primary.opacity(0.02))
     }
 
@@ -185,7 +196,7 @@ struct FileTranscriptionView: View {
             VStack(spacing: 12) {
                 ProgressView(value: progress)
                     .progressViewStyle(.linear)
-                    .frame(width: 280)
+                    .frame(width: 240)
                 
                 HStack {
                     if progress < 0.1 {
@@ -202,19 +213,19 @@ struct FileTranscriptionView: View {
                         Text(timeStr)
                     }
                 }
-                .font(.system(size: 11))
+                .font(.system(size: 10))
                 .foregroundStyle(.secondary)
-                .frame(width: 280)
+                .frame(width: 240)
             }
             
-            VStack(spacing: 8) {
+            VStack(spacing: 4) {
                 Text(currentFileName ?? "Processing...")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                     .foregroundStyle(.secondary)
                 
                 Text("\(Int(progress * 100))%")
-                    .font(.system(size: 42, weight: .bold, design: .monospaced))
+                    .font(.system(size: 36, weight: .bold, design: .monospaced))
                     .foregroundStyle(.primary)
             }
             
@@ -230,13 +241,13 @@ struct FileTranscriptionView: View {
                     Text("Cancel Transcription")
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, 10)
             }
             .buttonStyle(.bordered)
             .tint(.red)
             .controlSize(.large)
             .padding(.horizontal, 20)
-            .padding(.bottom, 24)
+            .padding(.bottom, 20)
         }
     }
 
@@ -266,10 +277,10 @@ struct FileTranscriptionView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .frame(maxHeight: 220)
-            .padding(16)
+            .frame(maxHeight: 180)
+            .padding(12)
             .background(Color.primary.opacity(0.04))
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             
             HStack(spacing: 12) {
                 Button {
@@ -283,7 +294,7 @@ struct FileTranscriptionView: View {
                         Text("Copy Result")
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 8)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
@@ -296,47 +307,47 @@ struct FileTranscriptionView: View {
                 } label: {
                     Text(fileQueue.isEmpty ? "New File" : "Next File (\(fileQueue.count))")
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, 8)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
             }
         }
-        .padding(24)
-        .padding(.bottom, 8)
+        .padding(20)
+        .padding(.bottom, 4)
     }
 
     private var dropZoneView: some View {
-        VStack(spacing: 12) {
-            Spacer().frame(height: 8)
+        VStack(spacing: 8) {
+            Spacer().frame(height: 4)
             
             ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(
-                        isDragging ? Color.accentColor : Color.secondary.opacity(0.3),
-                        style: StrokeStyle(lineWidth: 2, dash: [8, 4])
+                        isDragging ? Color.accentColor : Color.secondary.opacity(0.2),
+                        style: StrokeStyle(lineWidth: 1.5, dash: [6, 3])
                     )
                     .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(isDragging ? Color.accentColor.opacity(0.08) : Color.primary.opacity(0.03))
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(isDragging ? Color.accentColor.opacity(0.05) : Color.primary.opacity(0.02))
                     )
                 
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
                     Image(systemName: "arrow.down.doc.fill")
-                        .font(.system(size: 42))
-                        .foregroundStyle(isDragging ? Color.accentColor : .secondary.opacity(0.7))
-                        .padding(.bottom, 4)
+                        .font(.system(size: 32))
+                        .foregroundStyle(isDragging ? Color.accentColor : .secondary.opacity(0.6))
+                        .padding(.bottom, 2)
                     
-                    Text("Drop audio or video file here")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.primary.opacity(0.8))
+                    Text("Drop audio or video here")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.primary.opacity(0.7))
                     
                     Text("MP3, WAV, M4A, MP4, MOV")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary.opacity(0.6))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary.opacity(0.5))
                 }
             }
-            .frame(height: 200)
+            .frame(height: 160)
             .onDrop(of: [.fileURL], isTargeted: $isDragging) { providers in
                 handleDrop(providers)
             }
@@ -344,20 +355,20 @@ struct FileTranscriptionView: View {
             Button {
                 showFilePicker = true
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Image(systemName: "plus.circle.fill")
                     Text("Add to Queue...")
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
+                .padding(.vertical, 8)
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
             
-            Spacer().frame(height: 12)
+            Spacer().frame(height: 8)
         }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 16)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
     }
 
     private var errorOverlay: some View {
@@ -491,7 +502,10 @@ struct FileTranscriptionView: View {
                 }
             } catch {
                 await MainActor.run {
-                    self.error = error.localizedDescription
+                    // Suppress error if manually stopped
+                    if isProcessing {
+                        self.error = error.localizedDescription
+                    }
                     self.isProcessing = false
                     self.progress = 0
                 }
