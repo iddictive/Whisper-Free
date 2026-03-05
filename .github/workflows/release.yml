@@ -36,46 +36,48 @@ jobs:
       - name: Build App
         run: |
           swift build -c release
-          mkdir -p WhisperFree.app/Contents/MacOS
-          mkdir -p WhisperFree.app/Contents/Resources
+          mkdir -p WhisperKiller.app/Contents/MacOS
+          mkdir -p WhisperKiller.app/Contents/Resources
           
           # Find the binary dynamically
-          ACTUAL_BINARY=$(find .build -maxdepth 5 -name "WhisperFree" -type f -not -path "*.dSYM*" | grep release | head -n 1)
+          echo "🔍 Looking for binary: WhisperKiller in .build/..."
+          ACTUAL_BINARY=$(find .build -name "WhisperKiller" -type f -not -path "*.dSYM*" 2>/dev/null | grep -i "/release/" | head -n 1)
+          
           if [ -z "$ACTUAL_BINARY" ]; then
             echo "❌ Binary not found!"
-            find .build -name "WhisperFree" -type f 2>/dev/null
+            find .build -name "WhisperKiller" -type f 2>/dev/null
             exit 1
           fi
           echo "Found binary at: $ACTUAL_BINARY"
           
-          cp "$ACTUAL_BINARY" WhisperFree.app/Contents/MacOS/
-          chmod +x WhisperFree.app/Contents/MacOS/WhisperFree
+          cp "$ACTUAL_BINARY" WhisperKiller.app/Contents/MacOS/
+          chmod +x WhisperKiller.app/Contents/MacOS/WhisperKiller
           
-          cp Sources/WhisperFree/Resources/Info.plist WhisperFree.app/Contents/
+          cp Sources/WhisperFree/Resources/Info.plist WhisperKiller.app/Contents/
           
           # Inject metadata into Info.plist
-          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ env.APP_VERSION }}" "WhisperFree.app/Contents/Info.plist"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ env.APP_VERSION }}" "WhisperFree.app/Contents/Info.plist"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable WhisperFree" "WhisperFree.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ env.APP_VERSION }}" "WhisperKiller.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ env.APP_VERSION }}" "WhisperKiller.app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable WhisperKiller" "WhisperKiller.app/Contents/Info.plist"
           
           if [ -f Sources/WhisperFree/Resources/AppIcon.icns ]; then
-            cp Sources/WhisperFree/Resources/AppIcon.icns WhisperFree.app/Contents/Resources/
+            cp Sources/WhisperFree/Resources/AppIcon.icns WhisperKiller.app/Contents/Resources/
           fi
           
           # Ad-hoc sign after all files are in place
-          codesign --force --deep --sign - WhisperFree.app
+          codesign --force --deep --sign - WhisperKiller.app
 
       - name: Create DMG
         run: |
-          hdiutil create -volname "WhisperFree" -srcfolder "WhisperFree.app" -ov -format UDZO "WhisperFree.dmg"
+          hdiutil create -volname "WhisperKiller" -srcfolder "WhisperKiller.app" -ov -format UDZO "WhisperKiller.dmg"
 
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.APP_VERSION }}
-          name: WhisperFree v${{ env.APP_VERSION }}
+          name: WhisperKiller v${{ env.APP_VERSION }}
           files: |
-            WhisperFree.dmg
+            WhisperKiller.dmg
           draft: false
           prerelease: false
         env:
