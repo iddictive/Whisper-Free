@@ -373,6 +373,7 @@ struct AppSettings: Codable {
     var enablePostProcessing: Bool = true
     var useMonochromeMenuIcon: Bool = false
     var usageLogs: [UsageLog] = []
+    var experimentalAutoEnter: Bool = false
 
     var allModes: [TranscriptionMode] {
         TranscriptionMode.builtInModes + customModes

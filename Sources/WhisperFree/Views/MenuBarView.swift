@@ -5,6 +5,39 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // ─── Accessibility Warning ─────────────
+            if !AXIsProcessTrusted() {
+                Button {
+                    let options = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true] as CFDictionary
+                    AXIsProcessTrustedWithOptions(options)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.white)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("Accessibility Not Granted")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.white)
+                            Text("Click to open Settings")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.white.opacity(0.8))
+                        }
+                        Spacer()
+                        Image(systemName: "arrow.right.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.orange))
+                    .padding(.horizontal, 8)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+                }
+                .buttonStyle(.plain)
+            }
+
             // ─── Header + Record ────────────────
             HStack(spacing: 10) {
                 Image(systemName: "waveform")

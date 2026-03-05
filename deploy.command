@@ -61,9 +61,12 @@ if [ $? -eq 0 ]; then
         cp "$ICON_FILE" "$BUNDLE_NAME/Contents/Resources/AppIcon.icns"
     fi
     
-    # Ad-hoc code sign to allow launching on modern macOS
+    # Code sign with stable certificate to preserve Accessibility permissions across updates
     echo "🔑 Signing $BUNDLE_NAME..."
-    codesign --force --deep --sign - "$BUNDLE_NAME"
+    find "$BUNDLE_NAME" -type f -name "._*" -delete 2>/dev/null
+    find "$BUNDLE_NAME" -type f -name ".DS_Store" -delete 2>/dev/null
+    find "$BUNDLE_NAME" -exec xattr -c {} + 2>/dev/null
+    codesign --force --deep --sign "Mikhail Drozdov" "$BUNDLE_NAME"
     
     # 5. Launch
     echo "🏃 Launching $BUNDLE_NAME..."

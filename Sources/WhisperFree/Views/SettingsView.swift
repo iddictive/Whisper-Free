@@ -195,6 +195,17 @@ struct SettingsView: View {
                         appState.saveSettings()
                     }
             }
+            
+            Section("Experimental") {
+                Toggle("Auto-Enter (automatically send message)", isOn: $appState.settings.experimentalAutoEnter)
+                    .onChange(of: appState.settings.experimentalAutoEnter) { _, _ in
+                        appState.saveSettings()
+                    }
+                
+                Text("Simulates a Return key press after text insertion. Useful for chat applications.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

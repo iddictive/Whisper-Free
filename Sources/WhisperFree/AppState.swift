@@ -247,17 +247,20 @@ final class AppState: ObservableObject {
                         let result = try await processor.process(text: rawText, mode: settings.selectedMode)
                         processedText = result.text
                         
-                        // Create usage log
-                        let engine = settings.postProcessingEngine
-                        usage = UsageLog(
-                            date: Date(),
-                            modeName: settings.selectedMode.name,
-                            engine: engine.rawValue,
-                            promptTokens: result.promptTokens,
-                            completionTokens: result.completionTokens,
-                            totalTokens: result.promptTokens + result.completionTokens,
-                            estimatedCost: UsageLog.estimateCost(prompt: result.promptTokens, completion: result.completionTokens, engine: engine)
-                        )
+                        // Create usage log only if AI was actually used
+                        let totalTokens = result.promptTokens + result.completionTokens
+                        if totalTokens > 0 {
+                            let engine = settings.postProcessingEngine
+                            usage = UsageLog(
+                                date: Date(),
+                                modeName: settings.selectedMode.name,
+                                engine: engine.rawValue,
+                                promptTokens: result.promptTokens,
+                                completionTokens: result.completionTokens,
+                                totalTokens: totalTokens,
+                                estimatedCost: UsageLog.estimateCost(prompt: result.promptTokens, completion: result.completionTokens, engine: engine)
+                            )
+                        }
                     } catch {
                         // Log error but STILL use raw text as fallback
                         self.lastError = "AI refinement failed: \(error.localizedDescription). Using raw transcription."
@@ -276,6 +279,10 @@ final class AppState: ObservableObject {
                     // Small delay to let system handle window closing and focus return
                     try await Task.sleep(nanoseconds: 150_000_000)
                     AutoTyper.insert(text: processedText, method: settings.insertionMethod)
+                    
+                    if settings.experimentalAutoEnter {
+                        AutoTyper.simulateReturn()
+                    }
                 }
 
                 // 7. Save to history & usage logs

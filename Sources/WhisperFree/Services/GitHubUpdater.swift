@@ -169,9 +169,12 @@ class GitHubUpdater: ObservableObject {
 
     private func relaunch() {
         let appPath = "/Applications/WhisperFree.app"
+        let pid = ProcessInfo.processInfo.processIdentifier
+        // Launch a detached script that waits for us to die, then opens the new app
+        let script = "while kill -0 \(pid) 2>/dev/null; do sleep 0.1; done; open \"\(appPath)\""
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        process.arguments = [appPath]
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = ["-c", script]
         try? process.run()
         NSApp.terminate(nil)
     }

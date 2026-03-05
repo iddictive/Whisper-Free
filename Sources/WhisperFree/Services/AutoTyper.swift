@@ -74,5 +74,20 @@ final class AutoTyper {
             keyUp?.post(tap: .cgAnnotatedSessionEventTap)
         }
     }
+
+    /// Simulates pressing the Return (Enter) key
+    static func simulateReturn() {
+        // Small delay to ensure the previous text insertion is processed
+        usleep(50_000) // 50ms
+
+        let source = CGEventSource(stateID: .combinedSessionState)
+        let keyCode: CGKeyCode = 36 // Return key
+
+        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true)
+        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
+        
+        keyDown?.post(tap: .cgAnnotatedSessionEventTap)
+        keyUp?.post(tap: .cgAnnotatedSessionEventTap)
+    }
 }
 
