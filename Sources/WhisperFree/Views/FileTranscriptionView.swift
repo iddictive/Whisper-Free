@@ -31,7 +31,7 @@ struct FileTranscriptionView: View {
 
     var body: some View {
         ZStack {
-            VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+            VisualEffectView(material: .sidebar, blendingMode: .behindWindow)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
