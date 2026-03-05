@@ -41,7 +41,14 @@ final class AppState: ObservableObject {
     @Published var lastTranscription: String?
     @Published var backgroundJobs: [BackgroundJob] = []
     @Published var copiedFeedback = false
-    @Published var showOverlayWindow = false
+    @Published var showOverlayWindow = false {
+        didSet {
+            if !showOverlayWindow {
+                errorTimer?.cancel()
+                errorTimer = nil
+            }
+        }
+    }
     @Published var isHotkeyTrusted = false
     @Published var isTranslocated = false
     @Published var isRecordingHotkey = false {
@@ -60,6 +67,7 @@ final class AppState: ObservableObject {
     private let hotkeyManager = HotkeyManager()
     private var cancellables = Set<AnyCancellable>()
     var overlayCancellables = Set<AnyCancellable>()
+    private var errorTimer: AnyCancellable?
     
     // Hold-mode tracking
     private var keyDownTime: Date?
@@ -99,6 +107,11 @@ final class AppState: ObservableObject {
 
     func clearError() {
         lastError = nil
+        errorTimer?.cancel()
+        errorTimer = nil
+        if state == .idle {
+            showOverlayWindow = false
+        }
     }
 
     // MARK: - Settings
@@ -282,7 +295,7 @@ final class AppState: ObservableObject {
                 // 1. Transcribe
                 let engine = TranscriptionEngineFactory.create(for: settings.engineType, settings: settings)
                 let lang = settings.language == "auto" ? nil : settings.language
-                let rawText = try await engine.transcribe(audioURL: audioURL, language: lang)
+                let rawText = try await engine.transcribe(audioURL: audioURL, language: lang, onProgress: nil)
 
                 guard !rawText.isEmpty else {
                     lastError = "No speech detected. Try speaking more clearly or check your microphone."
@@ -334,7 +347,7 @@ final class AppState: ObservableObject {
                 if settings.autoTypeResult {
                     state = .typing
                     // Small delay to let system handle window closing and focus return
-                    try await Task.sleep(nanoseconds: 150_000_000)
+                    try await Task.sleep(nanoseconds: 50_000_000)
                     AutoTyper.insert(text: processedText, method: settings.insertionMethod)
                     
                     if settings.experimentalAutoEnter {
@@ -372,6 +385,15 @@ final class AppState: ObservableObject {
                 state = .idle
                 processingStage = .none
                 showOverlayWindow = true // Keep open to show error
+                
+                // Auto-dismiss error after 4 seconds
+                errorTimer = Just(())
+                    .delay(for: .seconds(4), scheduler: RunLoop.main)
+                    .sink { [weak self] in
+                        self?.showOverlayWindow = false
+                        self?.lastError = nil
+                    }
+                
                 recorder.cleanup()
                 resumeBackgroundJobs()
             }

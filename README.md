@@ -14,9 +14,9 @@
 
 ### Free Professional macOS GUI for local Voice-to-Text — No Subscriptions, 100% Privacy
 
-**Whisper Free** is a hyper-fast, high-performance macOS application designed to transcribe your voice to text instantly using OpenAI's Whisper models.
+**WhisperKiller** is a hyper-fast, high-performance macOS application designed to transcribe your voice to text instantly using OpenAI's Whisper models.
 
-> Love the convenience of AI dictation but hate paying monthly subscriptions for professional features? Whisper Free gives you the "SuperWhisper experience" for free, running locally on your Mac's GPU/NPU or via API.
+> Love the convenience of AI dictation but hate paying monthly subscriptions for professional features? WhisperKiller gives you the "SuperWhisper experience" for free, running locally on your Mac's GPU/NPU or via API.
 
 It is a **fully-featured SuperWhisper alternative** that puts privacy and speed first. No "marketing fluff," just raw performance.
 
@@ -24,7 +24,9 @@ It is a **fully-featured SuperWhisper alternative** that puts privacy and speed 
 - **Control**: Lives in the menu bar, triggered by a global hotkey (default `⌥ Space`).
 - **Transcription**: Local via [whisper.cpp](https://github.com/ggerganov/whisper.cpp) (GPU/NPU optimized) or cloud via OpenAI API.
 - **Workflow**: Results are automatically inserted into the active application via paste or direct typing.
+- **Improved Settings**: Redesigned 5-tab interface (App, Capture, Engine, AI Modes, Info) for better organization.
 - **Smart Modes**: 4 built-in modes (Dictation, Email, Code, Notes) + create your own custom AI prompts.
+- **Intelligent Keys**: API keys for OpenAI/Perplexity only appear when needed for your current engine.
 - **AI Refinement**: One-click post-processing via OpenAI or Perplexity to fix grammar and formatting.
 - **Global**: Supports 18 languages with auto-detection.
 
@@ -53,9 +55,9 @@ make install
 
 ### Профессиональный GUI для локального распознавания речи на macOS — Без подписок, 100% приватно
 
-**Whisper Free** — сверхбыстрое и производительное приложение для macOS, которое мгновенно превращает ваш голос в текст, используя модели Whisper от OpenAI.
+**WhisperKiller** — сверхбыстрое и производительное приложение для macOS, которое мгновенно превращает ваш голос в текст, используя модели Whisper от OpenAI.
 
-> Нравится удобство AI-диктовки, но не хочется платить ежемесячную подписку за "PRO"-функции? Whisper Free — это бесплатная альтернатива SuperWhisper, работающая локально на GPU/NPU вашего Mac или через API.
+> Нравится удобство AI-диктовки, но не хочется платить ежемесячную подписку за "PRO"-функции? WhisperKiller — это бесплатная альтернатива SuperWhisper, работающая локально на GPU/NPU вашего Mac или через API.
 
 Это **полнофункциональная замена SuperWhisper**, где в приоритете приватность и скорость. Минимум «маркетинговой воды», максимум производительности.
 
@@ -63,7 +65,9 @@ make install
 - **Управление**: Работает из Menu Bar по глобальной горячей клавише (по умолчанию `⌥ Space`).
 - **Транскрипция**: Локально через [whisper.cpp](https://github.com/ggerganov/whisper.cpp) (оптимизировано под Apple Silicon) или облако (OpenAI API).
 - **Интеграция**: Результат автоматически вставляется в активное приложение (вставка из буфера или прямая печать).
+- **Новый интерфейс**: Полностью переработанные настройки (5 вкладок: App, Capture, Engine, AI Modes, Info).
 - **Умные режимы**: 4 встроенных пресета (Диктовка, Email, Код, Заметки) + создание собственных AI-промптов.
+- **Умные ключи**: API-ключи OpenAI/Perplexity отображаются только когда они необходимы.
 - **AI-коррекция**: Постобработка через OpenAI или Perplexity для исправления грамматики и оформления.
 - **Языки**: Поддержка 18 языков с автоопределением.
 

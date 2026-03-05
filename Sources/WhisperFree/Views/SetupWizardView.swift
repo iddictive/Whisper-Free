@@ -528,9 +528,9 @@ struct SetupWizardView: View {
     private func modelRow(_ size: LocalModelSize) -> some View {
         let isCurrent = selectedModel == size
         let downloaded = modelManager.isModelDownloaded(size)
-        let isDownloading = modelManager.isDownloading(size)
-        let progress = modelManager.progress(for: size)
-        let error = modelManager.error(for: size)
+        _ = modelManager.isDownloading(size)
+        _ = modelManager.progress(for: size)
+        _ = modelManager.error(for: size)
         let isRecommended = size == LocalModelSize.recommended
 
         return HStack(spacing: 10) {
@@ -569,7 +569,7 @@ struct SetupWizardView: View {
                     .foregroundStyle(.green)
                     .font(.system(size: 14))
             } else if let state = modelManager.activeDownloads[size.rawValue] {
-                if let error = state.error {
+                if state.error != nil {
                     Text("Error").font(.system(size: 10)).foregroundStyle(.red)
                 } else if state.isPreparing {
                     HStack(spacing: 4) {

@@ -16,8 +16,6 @@ final class AudioRecorder: ObservableObject {
     private var startTime: Date?
     private let levelHistoryCount = 30
     private var recentLevels: [Float] = []
-    private var rollingPeak: Float = 0.05
-    private let peakDecay: Float = 0.997 // Very slow decay
 
     var currentRecordingURL: URL? { recordingURL }
 
@@ -26,14 +24,13 @@ final class AudioRecorder: ObservableObject {
         isTooQuiet = false
         isTooNoisy = false
         recentLevels.removeAll()
-        rollingPeak = 0.05 // Reset peak to a reasonable floor
         let engine = AVAudioEngine()
         let inputNode = engine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
 
         // Create temp file for recording
         let tempDir = FileManager.default.temporaryDirectory
-        let url = tempDir.appendingPathComponent("superwhisper_\(UUID().uuidString).wav")
+        let url = tempDir.appendingPathComponent("whisperkiller_\(UUID().uuidString).wav")
         recordingURL = url
 
         // Target format: 16kHz mono PCM (optimal for Whisper)
@@ -62,28 +59,24 @@ final class AudioRecorder: ObservableObject {
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
             guard let self = self else { return }
 
-            // Calculate raw RMS level for quality metrics and base visualization
-            let rawLevel = self.calculateRawRMS(buffer: buffer)
-            
-            // Adaptive gain for visualization
-            self.rollingPeak = max(self.rollingPeak * self.peakDecay, rawLevel)
-            let visualLevel = rawLevel / max(self.rollingPeak, 0.01)
+            // Calculate level for visualization
+            let level = self.calculateLevel(buffer: buffer)
             
             DispatchQueue.main.async {
-                self.audioLevels.append(visualLevel)
+                self.audioLevels.append(level)
                 if self.audioLevels.count > self.levelHistoryCount {
                     self.audioLevels.removeFirst()
                 }
                 
-                // Quality alerts logic (sliding window of raw levels)
-                self.recentLevels.append(rawLevel)
+                // Quality alerts logic (sliding window)
+                self.recentLevels.append(level)
                 if self.recentLevels.count > 20 { self.recentLevels.removeFirst() }
                 
                 if self.recentLevels.count >= 10 {
                     let avg = self.recentLevels.reduce(0, +) / Float(self.recentLevels.count)
-                    // Absolute thresholds for warnings (independent of adaptive gain)
-                    self.isTooQuiet = avg < 0.005 
-                    self.isTooNoisy = avg > 0.15 // Adjusting noise threshold based on raw RMS
+                    // Simple thresholds based on the amplified level
+                    self.isTooQuiet = avg < 0.02
+                    self.isTooNoisy = avg > 0.95
                 }
             }
 
@@ -126,8 +119,14 @@ final class AudioRecorder: ObservableObject {
     func stopRecording() -> URL? {
         timer?.invalidate()
         timer = nil
-        audioEngine?.inputNode.removeTap(onBus: 0)
-        audioEngine?.stop()
+        
+        if let engine = audioEngine {
+            if engine.isRunning {
+                engine.stop()
+            }
+            engine.inputNode.removeTap(onBus: 0)
+        }
+        
         audioEngine = nil
         audioFile = nil
         isRecording = false
@@ -154,7 +153,7 @@ final class AudioRecorder: ObservableObject {
         recordingURL = nil
     }
 
-    private func calculateRawRMS(buffer: AVAudioPCMBuffer) -> Float {
+    private func calculateLevel(buffer: AVAudioPCMBuffer) -> Float {
         guard let channelData = buffer.floatChannelData?[0] else { return 0 }
         let frames = Int(buffer.frameLength)
         
@@ -164,6 +163,10 @@ final class AudioRecorder: ObservableObject {
             sumSquares += sample * sample
         }
         
-        return sqrt(sumSquares / Float(max(frames, 1)))
+        let rms = sqrt(sumSquares / Float(max(frames, 1)))
+        
+        // Noise floor subtraction and strong amplification (standard professional approach)
+        let adjustedRms = max(0, rms - 0.001)
+        return min(adjustedRms * 45.0, 1.0)
     }
 }

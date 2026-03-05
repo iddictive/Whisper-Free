@@ -12,16 +12,17 @@
     <true/>
     <key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
     <array>
-        <string>/opt/homebrew/share/whisper-cpp/models/</string>
-        <string>/opt/homebrew/share/whisper.cpp/models/</string>
-        <string>/usr/local/share/whisper-cpp/models/</string>
-        <string>/usr/local/share/whisper.cpp/models/</string>
+        <string>/opt/homebrew/</string>
+        <string>/usr/local/</string>
+        <string>/usr/bin/</string>
+        <string>/bin/</string>
     </array>
     <key>com.apple.security.temporary-exception.files.absolute-path.read-executable</key>
     <array>
         <string>/opt/homebrew/</string>
         <string>/usr/local/</string>
-        <string>/usr/bin/which</string>
+        <string>/usr/bin/</string>
+        <string>/bin/</string>
     </array>
 </dict>
 </plist>

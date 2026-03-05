@@ -15,7 +15,7 @@ final class AutoTyper {
     /// Simulates Cmd+V to paste the current contents of the general pasteboard
     static func simulatePaste() {
         // Small delay to ensure the active application is ready after our overlay closes
-        usleep(100_000) // 100ms
+        usleep(50_000) // 50ms
 
         // Simulate ⌘+V using CGEvent
         let source = CGEventSource(stateID: .combinedSessionState)
@@ -34,7 +34,7 @@ final class AutoTyper {
         guard !text.isEmpty else { return }
         
         // Small delay to ensure the active application is ready
-        usleep(150_000) // 150ms
+        usleep(50_000) // 50ms
 
         let source = CGEventSource(stateID: .combinedSessionState)
         

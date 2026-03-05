@@ -81,7 +81,7 @@ struct RecordingOverlayContent: View {
             }
             
             if let _ = appState.lastError {
-                Button { appState.lastError = nil } label: {
+                Button { appState.clearError() } label: {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 14)).foregroundStyle(.white.opacity(0.6))
                 }.buttonStyle(.plain)
             }
@@ -99,7 +99,7 @@ struct RecordingOverlayContent: View {
         .clipShape(Capsule())
         .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
         .environment(\.colorScheme, .dark)
-        .padding(12)
+        .padding(8)
         .onAppear {
             withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
                 pulse = true
@@ -163,7 +163,7 @@ final class OverlayWindowController: NSObject, ObservableObject {
         let panelHeight: CGFloat = 80
         let safeTop = screen.frame.maxY - screen.visibleFrame.maxY
         let x = screen.frame.midX - (panelWidth / 2)
-        let y = screen.frame.maxY - panelHeight - safeTop - 4
+        let y = screen.frame.maxY - panelHeight - safeTop // Moved closer to notch
 
         let panel = NSPanel(
             contentRect: NSRect(x: x, y: y, width: panelWidth, height: panelHeight),

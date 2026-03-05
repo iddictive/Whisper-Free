@@ -19,34 +19,31 @@ struct SettingsView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selectedTab) {
-                Label("General", systemImage: "gearshape")
-                    .tag("general")
-                Label("Recording", systemImage: "mic")
-                    .tag("recording")
-                Label("Transcription", systemImage: "cpu")
-                    .tag("transcription")
+                Label("App", systemImage: "apps.iphone")
+                    .tag("app")
+                Label("Capture & Automation", systemImage: "mic.fill")
+                    .tag("capture")
+                Label("Engine & API", systemImage: "cpu.fill")
+                    .tag("engine")
                 Label("AI Modes", systemImage: "sparkles")
                     .tag("modes")
-                Label("Usage", systemImage: "chart.bar.fill")
-                    .tag("usage")
-                Label("About", systemImage: "info.circle")
-                    .tag("about")
+                Label("Usage & About", systemImage: "info.circle.fill")
+                    .tag("info")
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 260)
+            .navigationSplitViewColumnWidth(min: 210, ideal: 230, max: 280)
         } detail: {
             Form {
-                if !appState.isHotkeyTrusted && selectedTab != "about" {
+                if !appState.isHotkeyTrusted && selectedTab != "info" {
                     permissionBanner
                 }
                 
                 switch selectedTab {
-                case "general": generalSection
-                case "recording": recordingSection
-                case "transcription": transcriptionSection
+                case "app": appSection
+                case "capture": captureSection
+                case "engine": engineSection
                 case "modes": modesSection
-                case "usage": usageSection
-                case "about": aboutSection
+                case "info": infoSection
                 default: Text("Select a category")
                 }
             }
@@ -87,22 +84,8 @@ struct SettingsView: View {
 
     // MARK: - Sections
 
-    private var generalSection: some View {
+    private var appSection: some View {
         Group {
-            Section("AI Status") {
-                HStack {
-                    Image(systemName: "sparkles")
-                        .foregroundStyle(appState.settings.enablePostProcessing ? SW.accent : .secondary)
-                    Text("AI Refinement is now managed in **AI Modes**")
-                        .font(.subheadline)
-                    Spacer()
-                    Button("Go there") {
-                        selectedTab = "modes"
-                    }
-                    .buttonStyle(.link)
-                }
-            }
-            
             Section("Preferences") {
                 Picker("Preferred Language", selection: $appState.settings.language) {
                     ForEach(AppSettings.supportedLanguages, id: \.code) { lang in
@@ -117,51 +100,51 @@ struct SettingsView: View {
                     .onChange(of: appState.settings.useMonochromeMenuIcon) { _, _ in
                         appState.saveSettings()
                     }
+            }
+            
+            Section("Software Updates") {
+                Toggle("Automatically check for updates", isOn: $appState.settings.automaticallyChecksForUpdates)
+                    
+                Toggle("Automatically download updates", isOn: $appState.settings.automaticallyDownloadsUpdates)
+                    .disabled(!appState.settings.automaticallyChecksForUpdates)
                 
-                Section("Software Updates") {
-                    Toggle("Automatically check for updates", isOn: $appState.settings.automaticallyChecksForUpdates)
-                        
-                    Toggle("Automatically download updates", isOn: $appState.settings.automaticallyDownloadsUpdates)
-                        .disabled(!appState.settings.automaticallyChecksForUpdates)
-                    
-                    if let error = updater.error {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                    
-                    if updater.isDownloading {
-                        VStack(alignment: .leading, spacing: 4) {
-                            ProgressView(value: updater.downloadProgress)
-                                .progressViewStyle(.linear)
-                            Text("Downloading update... \(Int(updater.downloadProgress * 100))%")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                    } else if updater.updateAvailable {
-                        Button("Download & Install (v\(updater.latestVersion ?? ""))") {
-                            updater.startDownload()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
-                    } else {
-                        Button(updater.isChecking ? "Checking..." : "Check for Updates Now...") {
-                            updater.checkForUpdates(manual: true)
-                        }
-                        .disabled(updater.isChecking)
-                        .padding(.top, 4)
+                if let error = updater.error {
+                    Text(error)
                         .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                
+                if updater.isDownloading {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ProgressView(value: updater.downloadProgress)
+                            .progressViewStyle(.linear)
+                        Text("Downloading update... \(Int(updater.downloadProgress * 100))%")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
+                    .padding(.vertical, 4)
+                } else if updater.updateAvailable {
+                    Button("Download & Install (v\(updater.latestVersion ?? ""))") {
+                        updater.startDownload()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                } else {
+                    Button(updater.isChecking ? "Checking..." : "Check for Updates Now...") {
+                        updater.checkForUpdates(manual: true)
+                    }
+                    .disabled(updater.isChecking)
+                    .padding(.top, 4)
+                    .font(.caption)
                 }
             }
         }
     }
 
-    private var recordingSection: some View {
+    private var captureSection: some View {
         Group {
-            Section("Audio Capture") {
-                Picker("Recording Mode", selection: $appState.settings.recordingMode) {
+            Section("Recording Mode") {
+                Picker("Capture Style", selection: $appState.settings.recordingMode) {
                     ForEach(RecordingMode.allCases, id: \.self) { mode in
                         Label(mode.rawValue, systemImage: mode.icon).tag(mode)
                     }
@@ -184,35 +167,35 @@ struct SettingsView: View {
                     }
             }
             
-            Section("Preferences") {
+            Section("Automation") {
                 Toggle("Auto-type into active app", isOn: $appState.settings.autoTypeResult)
                     .onChange(of: appState.settings.autoTypeResult) { _, _ in
                         appState.saveSettings()
                     }
                 
+                Toggle("Auto-Enter (send message automatically)", isOn: $appState.settings.experimentalAutoEnter)
+                    .onChange(of: appState.settings.experimentalAutoEnter) { _, _ in
+                        appState.saveSettings()
+                    }
+                
+                Text("Auto-Enter simulates a Return key press after text insertion. Useful for chat applications.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Interface") {
                 Toggle("Show floating recording pill", isOn: $appState.settings.showOverlay)
                     .onChange(of: appState.settings.showOverlay) { _, _ in
                         appState.saveSettings()
                     }
             }
-            
-            Section("Experimental") {
-                Toggle("Auto-Enter (automatically send message)", isOn: $appState.settings.experimentalAutoEnter)
-                    .onChange(of: appState.settings.experimentalAutoEnter) { _, _ in
-                        appState.saveSettings()
-                    }
-                
-                Text("Simulates a Return key press after text insertion. Useful for chat applications.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 
-    private var transcriptionSection: some View {
+    private var engineSection: some View {
         Group {
-            Section("Transcription Provider") {
-                Picker("Provider", selection: $appState.settings.engineType) {
+            Section("Transcription Engine") {
+                Picker("Model Source", selection: $appState.settings.engineType) {
                     ForEach(TranscriptionEngineType.allCases, id: \.self) { type in
                         HStack {
                             Image(systemName: type.icon)
@@ -226,42 +209,12 @@ struct SettingsView: View {
                     if newValue == .local && appState.settings.selectedModeName == TranscriptionMode.dictation.name {
                         appState.settings.selectedModeName = TranscriptionMode.notes.name
                     }
-                    if newValue == .cloud && appState.settings.apiKey.isEmpty {
-                        // Optional warning or just let them add the key below
-                    }
-                    appState.saveSettings()
-                }
-
-                if appState.settings.engineType == .cloud && appState.settings.apiKey.isEmpty {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                        Text("OpenAI API key required for Cloud engine")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                        Spacer()
-                        Button("Add Key") {
-                            selectedTab = "modes"
-                        }
-                        .buttonStyle(.link)
-                        .font(.caption)
-                    }
-                }
-            }
-
-            Section("Language Settings") {
-                Picker("Primary Language", selection: $appState.settings.language) {
-                    ForEach(AppSettings.supportedLanguages, id: \.code) { lang in
-                        Text(lang.name).tag(lang.code)
-                    }
-                }
-                .onChange(of: appState.settings.language) { _, _ in
                     appState.saveSettings()
                 }
             }
 
             if appState.settings.engineType == .local {
-                Section("Local Models") {
+                Section("Local Models (whisper.cpp)") {
                     ForEach(LocalModelSize.allCases, id: \.self) { size in
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
@@ -295,7 +248,7 @@ struct SettingsView: View {
                                 }
                                 .buttonStyle(.plain)
                             } else if let state = modelManager.activeDownloads[size.rawValue] {
-                                if let error = state.error {
+                                if state.error != nil {
                                     VStack(alignment: .trailing, spacing: 2) {
                                         Text("Error").font(.caption2).foregroundStyle(.red)
                                         Button("Retry") {
@@ -328,21 +281,14 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Advanced") {
-                Toggle("Auto-insert into active app", isOn: $appState.settings.autoTypeResult)
-                    .onChange(of: appState.settings.autoTypeResult) { _, _ in
-                        appState.saveSettings()
-                    }
+            Section("AI Refinement & API Keys") {
+                AIConfigView(settings: $appState.settings, onSave: { appState.saveSettings() })
             }
         }
     }
 
     private var modesSection: some View {
         Group {
-            Section("AI Refinement Configuration") {
-                AIConfigView(settings: $appState.settings, onSave: { appState.saveSettings() })
-            }
-
             Text("Select Active Mode")
                 .font(.headline)
                 .padding(.top, 8)
@@ -442,9 +388,9 @@ struct SettingsView: View {
         }
     }
 
-    private var usageSection: some View {
+    private var infoSection: some View {
         Group {
-            Section("7-Day Usage Summary") {
+            Section("Usage Statistics (7 Days)") {
                 let logs = appState.settings.usageLogs
                 let totalTokens = logs.reduce(0) { $0 + $1.totalTokens }
                 let totalCost = logs.reduce(0.0) { $0 + $1.estimatedCost }
@@ -470,69 +416,62 @@ struct SettingsView: View {
                     .controlSize(.small)
                 }
                 .padding(.vertical, 8)
+                
+                if !logs.isEmpty {
+                    DisclosureGroup("Recent Activity Details") {
+                        VStack {
+                            ForEach(logs.reversed()) { log in
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(log.modeName).font(.system(size: 12, weight: .bold))
+                                        Text(log.date.formatted(date: .abbreviated, time: .shortened))
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    VStack(alignment: .trailing) {
+                                        Text("\(log.totalTokens) tokens").font(.system(size: 11, design: .monospaced))
+                                        Text(log.engine).font(.system(size: 9)).foregroundStyle(.secondary).italic()
+                                    }
+                                }
+                                .padding(.vertical, 2)
+                                Divider()
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
             }
             
-            Section("Recent Activity") {
-                if appState.settings.usageLogs.isEmpty {
-                    Text("No usage logs available.")
-                        .foregroundStyle(.secondary)
-                        .italic()
-                } else {
-                    List {
-                        ForEach(appState.settings.usageLogs.reversed()) { log in
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(log.modeName).font(.system(size: 13, weight: .bold))
-                                    Text(log.date.formatted(date: .abbreviated, time: .shortened))
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(.secondary)
-                                }
-                                
-                                Spacer()
-                                
-                                VStack(alignment: .trailing) {
-                                    Text("\(log.totalTokens) tokens").font(.system(size: 12, design: .monospaced))
-                                    Text(log.engine).font(.system(size: 10)).foregroundStyle(.secondary).italic()
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
+            Section("About Whisper Free") {
+                VStack(spacing: 20) {
+                    ZStack {
+                        Circle()
+                            .fill(LinearGradient(colors: [SW.accent, SW.accentBlue], startPoint: .topLeading, endPoint: .bottomTrailing).opacity(0.1))
+                        Image(systemName: "microphone.fill")
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundStyle(LinearGradient(colors: [SW.accent, SW.accentBlue], startPoint: .top, endPoint: .bottom))
                     }
-                    .frame(minHeight: 200)
+                    .frame(width: 80, height: 80)
+                    
+                    VStack(spacing: 8) {
+                        Text("Whisper Free").font(.system(size: 28, weight: .bold))
+                        Text("Version 2.0").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    
+                    Text("Hyper-fast voice to text for macOS.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    HStack(spacing: 24) {
+                        Link("GitHub", destination: URL(string: "https://github.com/iddictive/Whisper-Free")!)
+                        Link("iddictive", destination: URL(string: "https://github.com/iddictive")!)
+                    }
+                    .font(.caption)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
             }
-        }
-    }
-
-    private var aboutSection: some View {
-        Section {
-            VStack(spacing: 20) {
-                ZStack {
-                    Circle()
-                        .fill(LinearGradient(colors: [SW.accent, SW.accentBlue], startPoint: .topLeading, endPoint: .bottomTrailing).opacity(0.1))
-                    Image(systemName: "microphone.fill")
-                        .font(.system(size: 32, weight: .bold))
-                        .foregroundStyle(LinearGradient(colors: [SW.accent, SW.accentBlue], startPoint: .top, endPoint: .bottom))
-                }
-                .frame(width: 80, height: 80)
-                
-                VStack(spacing: 8) {
-                    Text("Whisper Free").font(.system(size: 28, weight: .bold))
-                    Text("Version 2.0").font(.subheadline).foregroundStyle(.secondary)
-                }
-                
-                Text("Hyper-fast voice to text for macOS.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                
-                HStack(spacing: 24) {
-                    Link("GitHub", destination: URL(string: "https://github.com/iddictive/Whisper-Free")!)
-                    Link("iddictive", destination: URL(string: "https://github.com/iddictive")!)
-                }
-                .font(.caption)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
         }
     }
 
@@ -588,49 +527,47 @@ struct AIConfigView: View {
                 onSave()
             }
             
-            if settings.enablePostProcessing {
-                let isOpenAI = settings.postProcessingEngine == .openai
-                let keyMissing = isOpenAI ? settings.apiKey.isEmpty : settings.perplexityApiKey.isEmpty
-                
-                if keyMissing {
-                    HStack {
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .foregroundStyle(.red)
-                        Text("\(settings.postProcessingEngine.rawValue) key missing. AI modes are disabled.")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    let isOpenAI = settings.postProcessingEngine == .openai
-                    Text(isOpenAI ? "OpenAI API Key" : "Perplexity API Key")
-                        .font(.caption).foregroundStyle(.secondary)
-                    
-                    HStack {
-                        SecureField("sk-...", text: isOpenAI ? $settings.apiKey : $settings.perplexityApiKey)
-                            .textFieldStyle(.roundedBorder)
-                            .onChange(of: settings.apiKey) { _, _ in
-                                settings.selectedModeName = settings.validatedModeName(currentName: settings.selectedModeName)
-                                onSave()
+            let requiresOpenAI = settings.engineType == .cloud || (settings.enablePostProcessing && settings.postProcessingEngine == .openai)
+            let requiresPerplexity = settings.enablePostProcessing && settings.postProcessingEngine == .perplexity
+            
+            if requiresOpenAI || requiresPerplexity {
+                VStack(alignment: .leading, spacing: 12) {
+                    if requiresOpenAI {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("OpenAI API Key").font(.caption).foregroundStyle(.secondary)
+                                if settings.engineType == .cloud {
+                                    Text("(Required for Transcription)").font(.system(size: 9)).foregroundStyle(.orange)
+                                }
                             }
-                            .onChange(of: settings.perplexityApiKey) { _, _ in
-                                settings.selectedModeName = settings.validatedModeName(currentName: settings.selectedModeName)
-                                onSave()
-                            }
-                        
-                        let currentMode = settings.allModes.first { $0.name == settings.selectedModeName } ?? .dictation
-                        if !settings.isModeEnabled(currentMode) && settings.selectedModeName != TranscriptionMode.dictation.name {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .foregroundStyle(.red)
-                                .font(.caption)
+                            SecureField("sk-...", text: $settings.apiKey)
+                                .textFieldStyle(.roundedBorder)
+                                .onChange(of: settings.apiKey) { _, _ in
+                                    settings.selectedModeName = settings.validatedModeName(currentName: settings.selectedModeName)
+                                    onSave()
+                                }
                         }
                     }
                     
-                    Text(settings.postProcessingEngine == .perplexity 
-                         ? "Perplexity Sonar: Best for intelligent grammar/flow." 
-                         : "OpenAI GPT: Reliable formatting and structuring.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if requiresPerplexity {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Perplexity API Key").font(.caption).foregroundStyle(.secondary)
+                            SecureField("pplx-...", text: $settings.perplexityApiKey)
+                                .textFieldStyle(.roundedBorder)
+                                .onChange(of: settings.perplexityApiKey) { _, _ in
+                                    settings.selectedModeName = settings.validatedModeName(currentName: settings.selectedModeName)
+                                    onSave()
+                                }
+                        }
+                    }
+                    
+                    if settings.enablePostProcessing {
+                        Text(settings.postProcessingEngine == .perplexity 
+                             ? "Perplexity Sonar: Best for intelligent grammar/flow." 
+                             : "OpenAI GPT: Reliable formatting and structuring.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .padding(.top, 4)
             }

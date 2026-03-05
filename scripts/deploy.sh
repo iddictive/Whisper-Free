@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# Whisper Free Deploy Script (Version 2.1)
-cd "$(dirname "$0")"
+# Whisper Free Deploy Script (Version 2.2)
+# Move to the project root (parent of scripts/)
+cd "$(dirname "$0")/.."
+echo "📂 Project root: $(pwd)"
 
 APP_NAME="WhisperKiller"
 BUNDLE_NAME="WhisperKiller.app"
@@ -63,22 +65,23 @@ if [ $? -eq 0 ]; then
         cp "$ICON_FILE" "$BUNDLE_NAME/Contents/Resources/AppIcon.icns"
     fi
     
-    # Code sign with entitlements
-    echo "🔑 Signing $BUNDLE_NAME with entitlements..."
-    find "$BUNDLE_NAME" -type f -name "._*" -delete 2>/dev/null
-    find "$BUNDLE_NAME" -type f -name ".DS_Store" -delete 2>/dev/null
-    find "$BUNDLE_NAME" -exec xattr -c {} + 2>/dev/null
-    
     ENTITLEMENTS="Sources/WhisperFree/Resources/WhisperKiller.entitlements"
-    codesign --force --options runtime --deep --entitlements "$ENTITLEMENTS" --sign "Mikhail Drozdov" "$BUNDLE_NAME"
+    echo "🔑 Signing $BUNDLE_NAME with entitlements..."
+    if ! codesign --force --options runtime --deep --entitlements "$ENTITLEMENTS" --sign "Mikhail Drozdov" "$BUNDLE_NAME" 2>/dev/null; then
+        echo "⚠️  Identity 'Mikhail Drozdov' not found. Falling back to ad-hoc signing..."
+        codesign --force --options runtime --deep --entitlements "$ENTITLEMENTS" --sign "-" "$BUNDLE_NAME"
+    fi
     
     # 5. Fix Permissions & Relocate
     echo "🏗️ Relocating to /Applications and fixing permissions..."
-    ./scripts/fix_accessibility.sh
+    if [ -f "./scripts/fix_accessibility.sh" ]; then
+        bash ./scripts/fix_accessibility.sh
+    else
+        echo "❌ scripts/fix_accessibility.sh not found!"
+        exit 1
+    fi
     
-    echo "✨ $APP_NAME v$VERSION is now in /Applications and should be prompted for Accessibility."
-    sleep 1
-    osascript -e 'tell application "Terminal" to close (every window whose name contains "deploy.command")' &
+    echo "✨ $APP_NAME v$VERSION successfully installed to /Applications."
     exit 0
 else
     echo "❌ Build failed."

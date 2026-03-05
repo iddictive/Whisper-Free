@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # WhisperKiller TCC/Permissions Fix Script
-# Resolves issues where Accessibility permissions are stuck or not showing up.
+# Move to project root
+cd "$(dirname "$0")/.."
 
 echo "🔍 Starting Permissions & Deployment Fix..."
 
