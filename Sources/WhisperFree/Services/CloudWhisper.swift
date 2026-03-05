@@ -10,7 +10,7 @@ final class CloudWhisper: TranscriptionEngine {
         self.apiKey = apiKey
     }
 
-    func transcribe(audioURL: URL, language: String?) async throws -> String {
+    func transcribe(audioURL: URL, language: String?, onProgress: ((Float) -> Void)?) async throws -> String {
         guard !apiKey.isEmpty else {
             throw TranscriptionError.noAPIKey
         }

@@ -3,7 +3,16 @@ import Foundation
 // MARK: - Transcription Engine Protocol
 
 protocol TranscriptionEngine {
-    func transcribe(audioURL: URL, language: String?) async throws -> String
+    func transcribe(audioURL: URL, language: String?, onProgress: ((Float) -> Void)?) async throws -> String
+    func pause()
+    func resume()
+    func cancel()
+}
+
+extension TranscriptionEngine {
+    func pause() {}
+    func resume() {}
+    func cancel() {}
 }
 
 enum TranscriptionError: LocalizedError {

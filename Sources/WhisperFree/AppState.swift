@@ -17,6 +17,18 @@ enum ProcessingStage: String {
     case none = ""
 }
 
+struct BackgroundJob: Identifiable, Equatable {
+    let id: UUID
+    let name: String
+    var progress: Float
+    var isPaused: Bool
+    var engine: TranscriptionEngine?
+
+    static func == (lhs: BackgroundJob, rhs: BackgroundJob) -> Bool {
+        lhs.id == rhs.id && lhs.progress == rhs.progress && lhs.isPaused == rhs.isPaused
+    }
+}
+
 @MainActor
 final class AppState: ObservableObject {
     static let shared = AppState()
@@ -27,6 +39,7 @@ final class AppState: ObservableObject {
     @Published var history: [TranscriptionHistoryEntry] = []
     @Published var lastError: String?
     @Published var lastTranscription: String?
+    @Published var backgroundJobs: [BackgroundJob] = []
     @Published var copiedFeedback = false
     @Published var showOverlayWindow = false
     @Published var isHotkeyTrusted = false
@@ -219,7 +232,26 @@ final class AppState: ObservableObject {
         lastError = nil
         state = .recording
         showOverlayWindow = true
+        pauseBackgroundJobs()
         recorder.startRecording()
+    }
+
+    private func pauseBackgroundJobs() {
+        for i in 0..<backgroundJobs.count {
+            if !backgroundJobs[i].isPaused {
+                backgroundJobs[i].isPaused = true
+                backgroundJobs[i].engine?.pause()
+            }
+        }
+    }
+
+    private func resumeBackgroundJobs() {
+        for i in 0..<backgroundJobs.count {
+            if backgroundJobs[i].isPaused {
+                backgroundJobs[i].isPaused = false
+                backgroundJobs[i].engine?.resume()
+            }
+        }
     }
 
 
@@ -228,6 +260,7 @@ final class AppState: ObservableObject {
         recorder.cleanup()
         state = .idle
         showOverlayWindow = false
+        resumeBackgroundJobs()
     }
 
     func stopAndTranscribe() {
@@ -332,6 +365,7 @@ final class AppState: ObservableObject {
                 state = .idle
                 processingStage = .none
                 recorder.cleanup()
+                resumeBackgroundJobs()
 
             } catch {
                 lastError = error.localizedDescription
@@ -339,6 +373,7 @@ final class AppState: ObservableObject {
                 processingStage = .none
                 showOverlayWindow = true // Keep open to show error
                 recorder.cleanup()
+                resumeBackgroundJobs()
             }
         }
     }
@@ -389,15 +424,26 @@ final class AppState: ObservableObject {
     }
 
     private func processFileTranscription(url: URL) async {
-        state = .processing
-        processingStage = .transcribing
+        let jobID = UUID()
+        let fileName = url.lastPathComponent
+        let engine = TranscriptionEngineFactory.create(for: settings.engineType, settings: settings)
+        
+        let initialJob = BackgroundJob(id: jobID, name: fileName, progress: 0, isPaused: false, engine: engine)
+        backgroundJobs.append(initialJob)
+        
         lastError = nil
 
         do {
-            let engine = TranscriptionEngineFactory.create(for: settings.engineType, settings: settings)
-            let result = try await engine.transcribe(audioURL: url, language: settings.language == "auto" ? nil : settings.language)
+            let result = try await engine.transcribe(audioURL: url, language: settings.language == "auto" ? nil : settings.language) { progress in
+                Task { @MainActor in
+                    if let index = self.backgroundJobs.firstIndex(where: { $0.id == jobID }) {
+                        self.backgroundJobs[index].progress = progress
+                    }
+                }
+            }
             
             // Success
+            backgroundJobs.removeAll { $0.id == jobID }
             lastTranscription = result
             let entry = TranscriptionHistoryEntry(
                 rawText: result,
@@ -411,17 +457,13 @@ final class AppState: ObservableObject {
             
             // Save to desktop by default
             let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
-            let fileName = url.deletingPathExtension().lastPathComponent + "_transcription.txt"
-            let outputURL = desktop.appendingPathComponent(fileName)
+            let outputName = url.deletingPathExtension().lastPathComponent + "_transcription.txt"
+            let outputURL = desktop.appendingPathComponent(outputName)
             try result.write(to: outputURL, atomically: true, encoding: .utf8)
-            
-            state = .idle
-            processingStage = .none
             
             // Notify user of success
             await MainActor.run {
-                lastError = "Success! Transcription saved to Desktop."
-                // Clear success message after 5 seconds
+                lastError = "Success! Transcription of \(fileName) saved to Desktop."
                 DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                     if self.lastError?.contains("Success") == true {
                         self.clearError()
@@ -429,8 +471,7 @@ final class AppState: ObservableObject {
                 }
             }
         } catch {
-            state = .idle
-            processingStage = .none
+            backgroundJobs.removeAll { $0.id == jobID }
             lastError = "File transcription failed: \(error.localizedDescription)"
         }
     }

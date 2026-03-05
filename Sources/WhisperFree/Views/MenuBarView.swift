@@ -217,6 +217,52 @@ struct MenuBarView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
 
+            // ─── Background Jobs ────────────────
+            if !appState.backgroundJobs.isEmpty {
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("BACKGROUND JOBS")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.secondary)
+                    
+                    ForEach(appState.backgroundJobs) { job in
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack {
+                                Image(systemName: "doc.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                                Text(job.name)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .lineLimit(1)
+                                Spacer()
+                                if job.isPaused {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "pause.fill").font(.system(size: 8))
+                                        Text("Priority Wait").font(.system(size: 10))
+                                    }
+                                    .foregroundStyle(.orange)
+                                } else {
+                                    Text("\(Int(job.progress * 100))%")
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(.accentColor)
+                                }
+                            }
+                            
+                            ProgressView(value: job.progress)
+                                .progressViewStyle(.linear)
+                                .tint(job.isPaused ? .orange : .accentColor)
+                                .scaleEffect(x: 1, y: 0.5, anchor: .center)
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(Color.primary.opacity(0.03))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            }
+
             // ─── Last Transcription ─────────────
             if let lastText = appState.lastTranscription {
                 Divider()

@@ -93,6 +93,17 @@ struct SetupWizardView: View {
             selectedModel = LocalModelSize.recommended
             animateGlow = true
         }
+        .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
+            if currentStep == 1 || currentStep == 4 {
+                refreshStatus()
+                // Auto-advance from permissions to engine if both granted
+                if currentStep == 1 && appState.isHotkeyTrusted && micGranted {
+                    withAnimation(.spring(response: 0.35)) {
+                        currentStep = 2
+                    }
+                }
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════

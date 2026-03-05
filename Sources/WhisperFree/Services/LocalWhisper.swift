@@ -6,12 +6,29 @@ import Foundation
 /// Models are downloaded automatically by ModelManager to ~/Library/Application Support/WhisperFree/Models/
 final class LocalWhisper: TranscriptionEngine, @unchecked Sendable {
     private let modelSize: LocalModelSize
+    private var currentProcess: Process?
 
     init(modelSize: LocalModelSize) {
         self.modelSize = modelSize
     }
 
-    func transcribe(audioURL: URL, language: String?) async throws -> String {
+    func pause() {
+        if let pid = currentProcess?.processIdentifier {
+            kill(pid, SIGSTOP)
+        }
+    }
+
+    func resume() {
+        if let pid = currentProcess?.processIdentifier {
+            kill(pid, SIGCONT)
+        }
+    }
+
+    func cancel() {
+        currentProcess?.terminate()
+    }
+
+    func transcribe(audioURL: URL, language: String?, onProgress: ((Float) -> Void)?) async throws -> String {
         let modelPath = await MainActor.run {
             AppState.shared.modelManager.findModelPath(for: self.modelSize)?.path
         }
@@ -20,64 +37,75 @@ final class LocalWhisper: TranscriptionEngine, @unchecked Sendable {
             throw TranscriptionError.modelNotDownloaded
         }
 
-        // Find whisper-cpp binary
         let whisperBinary = findWhisperBinary()
         guard let binary = whisperBinary else {
-            throw TranscriptionError.transcriptionFailed(
-                "whisper-cpp not found. Install via: brew install whisper-cpp"
-            )
+            throw TranscriptionError.transcriptionFailed("whisper-cpp not found.")
         }
 
-        // Convert audio to 16kHz WAV if needed (whisper-cpp expects this)
         let wavURL = try await convertTo16kHzWav(audioURL)
         defer { try? FileManager.default.removeItem(at: wavURL) }
 
         return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: binary)
+            let process = Process()
+            self.currentProcess = process
+            process.executableURL = URL(fileURLWithPath: binary)
 
-                var args = [
-                    "--model", path,
-                    "--file", wavURL.path,
-                    "--output-txt",
-                    "--no-timestamps",
-                    "--threads", "\(max(1, ProcessInfo.processInfo.activeProcessorCount - 2))"
-                ]
+            var args = [
+                "--model", path,
+                "--file", wavURL.path,
+                "--output-txt",
+                "--no-timestamps",
+                "--threads", "\(max(1, ProcessInfo.processInfo.activeProcessorCount - 2))"
+            ]
 
-                // Language
-                if let lang = language, lang != "auto" {
-                    args += ["--language", lang]
+            if let lang = language, lang != "auto" {
+                args += ["--language", lang]
+            }
+
+            process.arguments = args
+
+            let outputPipe = Pipe()
+            let errorPipe = Pipe()
+            process.standardOutput = outputPipe
+            process.standardError = errorPipe
+
+            // Watch stderr for progress
+            errorPipe.fileHandleForReading.readabilityHandler = { handle in
+                let data = handle.availableData
+                guard !data.isEmpty, let output = String(data: data, encoding: .utf8) else { return }
+                
+                // whisper.cpp progress format: "whisper_print_progress: progress =  20%"
+                if output.contains("progress =") {
+                    let parts = output.components(separatedBy: "progress =")
+                    if let lastPart = parts.last?.trimmingCharacters(in: .whitespaces),
+                       let percentStr = lastPart.components(separatedBy: "%").first,
+                       let percent = Float(percentStr.trimmingCharacters(in: .whitespaces)) {
+                        onProgress?(percent / 100.0)
+                    }
                 }
+            }
 
-                process.arguments = args
-
-                let outputPipe = Pipe()
-                let errorPipe = Pipe()
-                process.standardOutput = outputPipe
-                process.standardError = errorPipe
-
-                do {
-                    try process.run()
-                    process.waitUntilExit()
-
+            process.terminationHandler = { [weak self] p in
+                self?.currentProcess = nil
+                outputPipe.fileHandleForReading.readabilityHandler = nil
+                errorPipe.fileHandleForReading.readabilityHandler = nil
+                
+                if p.terminationStatus == 0 {
                     let outputData = outputPipe.fileHandleForReading.readDataToEndOfFile()
                     let output = String(data: outputData, encoding: .utf8) ?? ""
-
-                    if process.terminationStatus != 0 {
-                        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                        let errorOutput = String(data: errorData, encoding: .utf8) ?? "Unknown error"
-                        continuation.resume(throwing: TranscriptionError.transcriptionFailed(errorOutput))
-                        return
-                    }
-
-                    // Parse output — whisper-cpp outputs text lines, skip metadata
-                    let text = self.parseWhisperOutput(output)
+                    let text = self?.parseWhisperOutput(output) ?? ""
                     continuation.resume(returning: text)
-
-                } catch {
-                    continuation.resume(throwing: TranscriptionError.transcriptionFailed(error.localizedDescription))
+                } else {
+                    let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                    let errorOutput = String(data: errorData, encoding: .utf8) ?? "Unknown error"
+                    continuation.resume(throwing: TranscriptionError.transcriptionFailed(errorOutput))
                 }
+            }
+
+            do {
+                try process.run()
+            } catch {
+                continuation.resume(throwing: TranscriptionError.transcriptionFailed(error.localizedDescription))
             }
         }
     }

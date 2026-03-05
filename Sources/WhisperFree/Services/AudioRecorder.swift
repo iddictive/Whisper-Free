@@ -9,6 +9,8 @@ final class AudioRecorder: ObservableObject {
     @Published var isTooQuiet = false
     @Published var isTooNoisy = false
 
+    private var audioEngine: AVAudioEngine?
+    private var audioFile: AVAudioFile?
     private var recordingURL: URL?
     private var timer: Timer?
     private var startTime: Date?
