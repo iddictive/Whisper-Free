@@ -15,12 +15,18 @@ final class Storage {
     // MARK: - Settings
 
     func loadSettings() -> AppSettings {
-        guard let data = defaults.data(forKey: settingsKey),
-              let settings = try? decoder.decode(AppSettings.self, from: data)
-        else {
+        guard let data = defaults.data(forKey: settingsKey) else {
             return AppSettings()
         }
-        return settings
+        
+        do {
+            return try decoder.decode(AppSettings.self, from: data)
+        } catch {
+            print("⚠️ Error decoding settings: \(error)")
+            // If decoding fails, we still return AppSettings() to avoid crashing,
+            // but now we at least know why it happened.
+            return AppSettings()
+        }
     }
 
     func saveSettings(_ settings: AppSettings) {

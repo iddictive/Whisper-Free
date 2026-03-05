@@ -256,6 +256,21 @@ struct HotkeyConfig: Codable, Equatable, Hashable {
     var useControl: Bool = false
     var useShift: Bool = false
 
+    enum CodingKeys: String, CodingKey {
+        case keyCode, useOption, useCommand, useControl, useShift
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        keyCode = try container.decodeIfPresent(Int.self, forKey: .keyCode) ?? 49
+        useOption = try container.decodeIfPresent(Bool.self, forKey: .useOption) ?? true
+        useCommand = try container.decodeIfPresent(Bool.self, forKey: .useCommand) ?? false
+        useControl = try container.decodeIfPresent(Bool.self, forKey: .useControl) ?? false
+        useShift = try container.decodeIfPresent(Bool.self, forKey: .useShift) ?? false
+    }
+
     var displayString: String {
         var parts: [String] = []
         if useControl { parts.append("⌃") }
@@ -374,6 +389,40 @@ struct AppSettings: Codable {
     var useMonochromeMenuIcon: Bool = false
     var usageLogs: [UsageLog] = []
     var experimentalAutoEnter: Bool = false
+
+    enum CodingKeys: String, CodingKey {
+        case apiKey, perplexityApiKey, postProcessingEngine, autoTypeResult, language,
+             selectedModeName, customModes, recordingMode, engineType, localModelSize,
+             showOverlay, setupCompleted, hotkeyConfig, insertionMethod,
+             automaticallyChecksForUpdates, automaticallyDownloadsUpdates,
+             enablePostProcessing, useMonochromeMenuIcon, usageLogs, experimentalAutoEnter
+    }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey) ?? ""
+        perplexityApiKey = try container.decodeIfPresent(String.self, forKey: .perplexityApiKey) ?? ""
+        postProcessingEngine = try container.decodeIfPresent(PostProcessingEngine.self, forKey: .postProcessingEngine) ?? .openai
+        autoTypeResult = try container.decodeIfPresent(Bool.self, forKey: .autoTypeResult) ?? true
+        language = try container.decodeIfPresent(String.self, forKey: .language) ?? "auto"
+        selectedModeName = try container.decodeIfPresent(String.self, forKey: .selectedModeName) ?? TranscriptionMode.dictation.name
+        customModes = try container.decodeIfPresent([TranscriptionMode].self, forKey: .customModes) ?? []
+        recordingMode = try container.decodeIfPresent(RecordingMode.self, forKey: .recordingMode) ?? .hold
+        engineType = try container.decodeIfPresent(TranscriptionEngineType.self, forKey: .engineType) ?? .cloud
+        localModelSize = try container.decodeIfPresent(LocalModelSize.self, forKey: .localModelSize) ?? .base
+        showOverlay = try container.decodeIfPresent(Bool.self, forKey: .showOverlay) ?? true
+        setupCompleted = try container.decodeIfPresent(Bool.self, forKey: .setupCompleted) ?? false
+        hotkeyConfig = try container.decodeIfPresent(HotkeyConfig.self, forKey: .hotkeyConfig) ?? HotkeyConfig()
+        insertionMethod = try container.decodeIfPresent(InsertionMethod.self, forKey: .insertionMethod) ?? .type
+        automaticallyChecksForUpdates = try container.decodeIfPresent(Bool.self, forKey: .automaticallyChecksForUpdates) ?? true
+        automaticallyDownloadsUpdates = try container.decodeIfPresent(Bool.self, forKey: .automaticallyDownloadsUpdates) ?? true
+        enablePostProcessing = try container.decodeIfPresent(Bool.self, forKey: .enablePostProcessing) ?? true
+        useMonochromeMenuIcon = try container.decodeIfPresent(Bool.self, forKey: .useMonochromeMenuIcon) ?? false
+        usageLogs = try container.decodeIfPresent([UsageLog].self, forKey: .usageLogs) ?? []
+        experimentalAutoEnter = try container.decodeIfPresent(Bool.self, forKey: .experimentalAutoEnter) ?? false
+    }
 
     var allModes: [TranscriptionMode] {
         TranscriptionMode.builtInModes + customModes
