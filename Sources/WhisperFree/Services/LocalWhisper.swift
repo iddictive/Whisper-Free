@@ -72,6 +72,7 @@ final class LocalWhisper: TranscriptionEngine, @unchecked Sendable {
                 "--model", path,
                 "--file", wavURL.path,
                 "--no-timestamps",
+                "--print-progress",
                 "--threads", "\(max(1, ProcessInfo.processInfo.activeProcessorCount - 2))"
             ]
 
@@ -102,15 +103,11 @@ final class LocalWhisper: TranscriptionEngine, @unchecked Sendable {
                 lock.unlock()
                 
                 // Parse progress from stdout (some whisper versions output here)
-                if let text = String(data: chunk, encoding: .utf8), text.contains("progress =") {
+                if let text = String(data: chunk, encoding: .utf8) {
                     let lines = text.components(separatedBy: .newlines)
                     for line in lines where line.contains("progress =") {
-                        let parts = line.components(separatedBy: "progress =")
-                        if let lastPart = parts.last?.trimmingCharacters(in: .whitespaces),
-                           let percentStr = lastPart.components(separatedBy: "%").first,
-                           let percent = Float(percentStr.trimmingCharacters(in: .whitespaces)) {
-                            let whisperProgress = percent / 100.0
-                            let totalProgress = 0.15 + (whisperProgress * 0.85)
+                        if let percent = self.extractProgress(from: line) {
+                            let totalProgress = 0.15 + (percent * 0.85)
                             var remainingTime: TimeInterval?
                             if totalProgress > 0.20 {
                                 let elapsed = Date().timeIntervalSince(startTime)
@@ -131,15 +128,11 @@ final class LocalWhisper: TranscriptionEngine, @unchecked Sendable {
                 lock.unlock()
                 
                 // Parse progress from stderr (some whisper versions output here)
-                if let text = String(data: chunk, encoding: .utf8), text.contains("progress =") {
+                if let text = String(data: chunk, encoding: .utf8) {
                     let lines = text.components(separatedBy: .newlines)
                     for line in lines where line.contains("progress =") {
-                        let parts = line.components(separatedBy: "progress =")
-                        if let lastPart = parts.last?.trimmingCharacters(in: .whitespaces),
-                           let percentStr = lastPart.components(separatedBy: "%").first,
-                           let percent = Float(percentStr.trimmingCharacters(in: .whitespaces)) {
-                            let whisperProgress = percent / 100.0
-                            let totalProgress = 0.15 + (whisperProgress * 0.85)
+                        if let percent = self.extractProgress(from: line) {
+                            let totalProgress = 0.15 + (percent * 0.85)
                             var remainingTime: TimeInterval?
                             if totalProgress > 0.20 {
                                 let elapsed = Date().timeIntervalSince(startTime)
@@ -345,15 +338,36 @@ final class LocalWhisper: TranscriptionEngine, @unchecked Sendable {
         print(raw)
         print("whisper_debug: ---END---")
         
-        // whisper-cpp outputs lines like "[00:00:00.000 --> 00:00:05.000]  Hello world"
-        // or plain text depending on flags. We use --no-timestamps so it's plain text
         let lines = raw.components(separatedBy: .newlines)
         let textLines = lines
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && !$0.hasPrefix("[") && !$0.hasPrefix("whisper_") && !$0.hasPrefix("main:") }
+            .filter { !$0.isEmpty && !$0.hasPrefix("[") && !$0.hasPrefix("whisper_") && !$0.hasPrefix("main:") && !$0.contains("progress =") }
 
         let result = textLines.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         print("whisper_debug: 📝 Parsed result: '\(result)' (kept \(textLines.count)/\(lines.count) lines)")
         return result
+    }
+
+    private func extractProgress(from line: String) -> Float? {
+        // Look for "progress = 42%" or "[ 42%] progress = 42%"
+        // Using a simpler but more robust split search if regex is overkill
+        if let progressPart = line.components(separatedBy: "progress =").last?.trimmingCharacters(in: .whitespaces),
+           let percentStr = progressPart.components(separatedBy: "%").first,
+           let percent = Float(percentStr.trimmingCharacters(in: .whitespaces)) {
+            return percent / 100.0
+        }
+        
+        // Fallback to regex for patterns like "[ 42%]"
+        let pattern = "(\\d+)%"
+        if let regex = try? NSRegularExpression(pattern: pattern, options: []) {
+            let nsRange = NSRange(line.startIndex..<line.endIndex, in: line)
+            if let match = regex.firstMatch(in: line, options: [], range: nsRange) {
+                if let range = Range(match.range(at: 1), in: line),
+                   let percent = Float(line[range]) {
+                    return percent / 100.0
+                }
+            }
+        }
+        return nil
     }
 }

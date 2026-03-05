@@ -35,10 +35,12 @@ final class AppState: ObservableObject {
 
     // Statistics calculated directly from history for accuracy/self-healing
     var totalWords: Int {
-        history.reduce(0) { $0 + $1.processedText.split { $0.isWhitespace }.count }
+        history.filter { !$0.isFromFileImport }
+               .reduce(0) { $0 + $1.processedText.split { $0.isWhitespace }.count }
     }
     var totalDuration: TimeInterval {
-        history.reduce(0) { $0 + $1.duration }
+        history.filter { !$0.isFromFileImport }
+               .reduce(0) { $0 + $1.duration }
     }
     var averageWPM: Int {
         let minutes = totalDuration / 60.0

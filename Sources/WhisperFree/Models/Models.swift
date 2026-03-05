@@ -112,8 +112,9 @@ struct TranscriptionHistoryEntry: Codable {
     let duration: TimeInterval
     let engineUsed: String
     var usage: UsageLog?
+    var isFromFileImport: Bool = false
 
-    init(rawText: String, processedText: String, modeName: String, duration: TimeInterval, engineUsed: String, usage: UsageLog? = nil) {
+    init(rawText: String, processedText: String, modeName: String, duration: TimeInterval, engineUsed: String, usage: UsageLog? = nil, isFromFileImport: Bool = false) {
         self.entryId = UUID()
         self.date = Date()
         self.rawText = rawText
@@ -122,6 +123,7 @@ struct TranscriptionHistoryEntry: Codable {
         self.duration = duration
         self.engineUsed = engineUsed
         self.usage = usage
+        self.isFromFileImport = isFromFileImport
     }
 }
 
