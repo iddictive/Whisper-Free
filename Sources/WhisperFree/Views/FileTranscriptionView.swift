@@ -51,7 +51,13 @@ struct FileTranscriptionView: View {
             
             errorOverlay
         }
-        .frame(minWidth: 400, minHeight: 400)
+        .frame(minWidth: 400, minHeight: 320)
+        .onDisappear {
+            engine?.cancel()
+            isProcessing = false
+            fileQueue.removeAll()
+            remainingTime = nil
+        }
         .fileImporter(
             isPresented: $showFilePicker,
             allowedContentTypes: [.audio, .video, .movie, .quickTimeMovie, .mpeg4Movie, .wav, .mp3, .aiff],
@@ -190,8 +196,10 @@ struct FileTranscriptionView: View {
     }
 
     private var progressView: some View {
-        VStack(spacing: 20) {
-            Spacer()
+        VStack(spacing: 24) {
+            Color.clear.frame(height: 20) // Top gap
+
+
             
             VStack(spacing: 12) {
                 ProgressView(value: progress)
@@ -229,7 +237,8 @@ struct FileTranscriptionView: View {
                     .foregroundStyle(.primary)
             }
             
-            Spacer()
+            
+            // Removed Spacer() to eliminate holes
             
             Button {
                 engine?.cancel()
@@ -318,8 +327,8 @@ struct FileTranscriptionView: View {
     }
 
     private var dropZoneView: some View {
-        VStack(spacing: 8) {
-            Spacer().frame(height: 4)
+        VStack(spacing: 12) {
+            // Removed Spacer() to eliminate holes
             
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -365,7 +374,7 @@ struct FileTranscriptionView: View {
             .buttonStyle(.bordered)
             .controlSize(.large)
             
-            Spacer().frame(height: 8)
+            // Removed Spacer() to eliminate holes
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
