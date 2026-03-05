@@ -3,19 +3,19 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>Whisper Free</string>
+	<string>WhisperKiller</string>
 	<key>CFBundleExecutable</key>
-	<string>WhisperFree</string>
+	<string>WhisperKiller</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.whisperfree.app</string>
+	<string>com.whisperkiller.app</string>
 	<key>CFBundleName</key>
-	<string>WhisperFree</string>
+	<string>WhisperKiller</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.0.34</string>
+	<string>2.0.36</string>
 	<key>CFBundleVersion</key>
-	<string>2.0.34</string>
+	<string>2.0.36</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>

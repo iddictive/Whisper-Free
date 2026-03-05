@@ -30,6 +30,7 @@ final class AppState: ObservableObject {
     @Published var copiedFeedback = false
     @Published var showOverlayWindow = false
     @Published var isHotkeyTrusted = false
+    @Published var isTranslocated = false
     @Published var isRecordingHotkey = false {
         didSet {
             if isRecordingHotkey {
@@ -65,11 +66,26 @@ final class AppState: ObservableObject {
             }
         }
         
+        checkTranslocation()
         self.isHotkeyTrusted = hotkeyManager.isTrusted
         print("🔑 Hotkey trusted: \(isHotkeyTrusted)")
         setupHotkey()
         startPermissionCheckTimer()
         print("✅ AppState init complete")
+    }
+
+    private func checkTranslocation() {
+        // Simple check for App Translocation (security scoping)
+        // If the path contains "/AppTranslocation/", it's likely translocated
+        let path = Bundle.main.bundlePath
+        self.isTranslocated = path.contains("/AppTranslocation/")
+        if isTranslocated {
+            print("⚠️ App is running in TRANSLOCATED mode. Path: \(path)")
+        }
+    }
+
+    func clearError() {
+        lastError = nil
     }
 
     // MARK: - Settings
@@ -93,6 +109,14 @@ final class AppState: ObservableObject {
             onKeyDown: { [weak self] in self?.handleKeyDown() },
             onKeyUp: { [weak self] in self?.handleKeyUp() }
         )
+    }
+
+    func requestAccessibilityPermission() {
+        let trusted = hotkeyManager.checkTrust(prompt: true)
+        self.isHotkeyTrusted = trusted
+        if trusted {
+            reloadHotkeyManager()
+        }
     }
 
     private func startPermissionCheckTimer() {
@@ -344,5 +368,70 @@ final class AppState: ObservableObject {
     private func cleanupOldLogs() {
         let sevenDaysAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
         settings.usageLogs.removeAll { $0.date < sevenDaysAgo }
+    }
+
+    // MARK: - File Transcription
+
+    func transcribeSelectedFile() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.audio, .video, .movie, .quickTimeMovie, .mpeg4Movie]
+        panel.title = "Select Audio or Video File"
+        panel.prompt = "Transcribe"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            Task {
+                await processFileTranscription(url: url)
+            }
+        }
+    }
+
+    private func processFileTranscription(url: URL) async {
+        state = .processing
+        processingStage = .transcribing
+        lastError = nil
+
+        do {
+            let engine = TranscriptionEngineFactory.create(for: settings.engineType, settings: settings)
+            let result = try await engine.transcribe(audioURL: url, language: settings.language == "auto" ? nil : settings.language)
+            
+            // Success
+            lastTranscription = result
+            let entry = TranscriptionHistoryEntry(
+                rawText: result,
+                processedText: result,
+                modeName: "File Import",
+                duration: 0,
+                engineUsed: settings.engineType.rawValue
+            )
+            Storage.shared.addTranscriptionHistoryEntry(entry)
+            history.insert(entry, at: 0)
+            
+            // Save to desktop by default
+            let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
+            let fileName = url.deletingPathExtension().lastPathComponent + "_transcription.txt"
+            let outputURL = desktop.appendingPathComponent(fileName)
+            try result.write(to: outputURL, atomically: true, encoding: .utf8)
+            
+            state = .idle
+            processingStage = .none
+            
+            // Notify user of success
+            await MainActor.run {
+                lastError = "Success! Transcription saved to Desktop."
+                // Clear success message after 5 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    if self.lastError?.contains("Success") == true {
+                        self.clearError()
+                    }
+                }
+            }
+        } catch {
+            state = .idle
+            processingStage = .none
+            lastError = "File transcription failed: \(error.localizedDescription)"
+        }
     }
 }

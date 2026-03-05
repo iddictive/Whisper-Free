@@ -2,18 +2,18 @@
 import PackageDescription
 
 let package = Package(
-    name: "WhisperFree",
+    name: "WhisperKiller",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "WhisperFree", targets: ["WhisperFree"])
+        .executable(name: "WhisperKiller", targets: ["WhisperKiller"])
     ],
     dependencies: [
     ],
     targets: [
         .executableTarget(
-            name: "WhisperFree",
+            name: "WhisperKiller",
             dependencies: [
             ],
             path: "Sources/WhisperFree",

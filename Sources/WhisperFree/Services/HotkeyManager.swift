@@ -15,6 +15,12 @@ final class HotkeyManager {
         AXIsProcessTrusted()
     }
 
+    /// Explicitly check trust including prompt if needed
+    func checkTrust(prompt: Bool) -> Bool {
+        let options = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): prompt] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
+    }
+
 
     deinit {
         stop()

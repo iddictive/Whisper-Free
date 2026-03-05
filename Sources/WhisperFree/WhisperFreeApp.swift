@@ -9,7 +9,7 @@ struct WhisperFreeApp: App {
     @StateObject private var appState = AppState.shared
     
     init() {
-        print("🚀 WhisperFreeApp initializing...")
+        print("🚀 WhisperKillerApp initializing...")
     }
     
     var body: some Scene {
@@ -150,7 +150,7 @@ final class SettingsWindowController: NSObject {
         )
         window.center()
         window.contentView = hostingView
-        window.title = "WhisperFree Settings"
+        window.title = "WhisperKiller Settings"
         window.titleVisibility = .visible
         window.isReleasedWhenClosed = false
         

@@ -262,6 +262,14 @@ struct HotkeyConfig: Codable, Equatable, Hashable {
 
     init() {}
 
+    init(keyCode: Int, useOption: Bool = false, useCommand: Bool = false, useControl: Bool = false, useShift: Bool = false) {
+        self.keyCode = keyCode
+        self.useOption = useOption
+        self.useCommand = useCommand
+        self.useControl = useControl
+        self.useShift = useShift
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         keyCode = try container.decodeIfPresent(Int.self, forKey: .keyCode) ?? 49

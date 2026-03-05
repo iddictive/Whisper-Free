@@ -9,7 +9,14 @@ struct MenuBarView: View {
             if !AXIsProcessTrusted() {
                 Button {
                     let options = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true] as CFDictionary
-                    AXIsProcessTrustedWithOptions(options)
+                    let trusted = AXIsProcessTrustedWithOptions(options)
+                    if !trusted {
+                        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+                        if !NSWorkspace.shared.open(url) {
+                            let fallback = URL(string: "x-apple.systempreferences:com.apple.preference.security")!
+                            NSWorkspace.shared.open(fallback)
+                        }
+                    }
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -43,7 +50,7 @@ struct MenuBarView: View {
                 Image(systemName: "waveform")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
-                Text("Whisper Free")
+                Text("WhisperKiller")
                     .font(.system(size: 13, weight: .bold))
 
                 Spacer()
@@ -256,16 +263,28 @@ struct MenuBarView: View {
             // ─── Error ──────────────────────────
             if let error = appState.lastError {
                 Divider()
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                     Text(error)
                         .font(.caption)
                         .foregroundStyle(.orange)
                         .lineLimit(2)
+                    Spacer()
+                    Button {
+                        appState.clearError()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.orange.opacity(0.8))
+                    }
+                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
+                .background(Color.orange.opacity(0.1))
+                .onTapGesture {
+                    appState.clearError()
+                }
             }
 
             Divider()
@@ -277,6 +296,9 @@ struct MenuBarView: View {
                 }
                 menuButton(icon: "clock", title: "History") {
                     AppDelegate.shared?.showHistory()
+                }
+                menuButton(icon: "doc.badge.plus", title: "Transcribe File...") {
+                    appState.transcribeSelectedFile()
                 }
                 menuButton(icon: "wand.and.stars", title: "Setup Wizard") {
                     AppDelegate.shared?.showSetupWizard()

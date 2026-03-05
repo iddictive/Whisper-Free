@@ -260,16 +260,17 @@ struct SetupWizardView: View {
                 desc: "For the global ⌥+Space hotkey to work anywhere",
                 granted: appState.isHotkeyTrusted
             ) {
-                // Prompt for accessibility if not granted
-                let options = [kAXTrustedCheckOptionPrompt.takeRetainedValue(): true] as CFDictionary
-                let granted = AXIsProcessTrustedWithOptions(options)
-                // AppState timer will pick this up automatically
-                
-                if !granted {
+                appState.requestAccessibilityPermission()
+                if !appState.isHotkeyTrusted {
+                    // Try to open the most specific privacy pane for accessibility
                     let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-                    NSWorkspace.shared.open(url)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) { refreshStatus() }
+                    if !NSWorkspace.shared.open(url) {
+                        // Fallback if specific URL fails
+                        let fallback = URL(string: "x-apple.systempreferences:com.apple.preference.security")!
+                        NSWorkspace.shared.open(fallback)
+                    }
                 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { refreshStatus() }
             }
 
             permissionCard(
@@ -279,7 +280,14 @@ struct SetupWizardView: View {
                 granted: micGranted
             ) {
                 AVCaptureDevice.requestAccess(for: .audio) { granted in
-                    DispatchQueue.main.async { micGranted = granted }
+                    DispatchQueue.main.async { 
+                        micGranted = granted 
+                        if !granted {
+                            // If denied, guide to settings
+                            let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
                 }
             }
 
@@ -295,6 +303,41 @@ struct SetupWizardView: View {
             }
             .buttonStyle(.plain)
             .padding(.top, 4)
+
+            if appState.isTranslocated {
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.octagon.fill")
+                            .foregroundStyle(.red)
+                        Text("App Translocation Detected")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.red)
+                    }
+                    Text("To ensure permissions like Accessibility and Microphone work correctly, please move WhisperFree to your Applications folder.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    
+                    Button {
+                        let url = URL(fileURLWithPath: "/Applications")
+                        NSWorkspace.shared.open(url)
+                    } label: {
+                        Text("Open Applications Folder")
+                            .font(.system(size: 11, weight: .semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.red.opacity(0.15))
+                            .foregroundStyle(.red)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(14)
+                .background(Color.red.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.red.opacity(0.2), lineWidth: 1))
+                .padding(.top, 8)
+            }
         }
     }
 
@@ -514,19 +557,28 @@ struct SetupWizardView: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
                     .font(.system(size: 14))
-            } else if isDownloading {
-                HStack(spacing: 4) {
-                    ProgressView(value: progress)
-                        .progressViewStyle(.linear)
-                        .frame(width: 40)
-                    Button {
-                        modelManager.cancelDownload(size)
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(textSecondary)
+            } else if let state = modelManager.activeDownloads[size.rawValue] {
+                if let error = state.error {
+                    Text("Error").font(.system(size: 10)).foregroundStyle(.red)
+                } else if state.isPreparing {
+                    HStack(spacing: 4) {
+                        ProgressView().controlSize(.mini)
+                        Text("Preparing...").font(.system(size: 9)).foregroundStyle(textSecondary)
                     }
-                    .buttonStyle(.plain)
+                } else {
+                    HStack(spacing: 4) {
+                        ProgressView(value: state.progress)
+                            .progressViewStyle(.linear)
+                            .frame(width: 80)
+                        Button {
+                            modelManager.cancelDownload(size)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(textSecondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             } else {
                 VStack(alignment: .trailing, spacing: 2) {
@@ -546,12 +598,6 @@ struct SetupWizardView: View {
                         .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
-
-                    if error != nil {
-                        Text("Failed")
-                            .font(.system(size: 8))
-                            .foregroundStyle(.red)
-                    }
                 }
             }
         }
@@ -775,6 +821,7 @@ struct SetupWizardView: View {
             // Next / Finish
             if currentStep < totalSteps - 1 {
                 Button {
+                    refreshStatus() // Refresh status before moving
                     withAnimation(.spring(response: 0.35)) { currentStep += 1 }
                 } label: {
                     HStack(spacing: 6) {
@@ -837,7 +884,10 @@ struct SetupWizardView: View {
             "/opt/homebrew/bin/whisper-cpp", "/usr/local/bin/whisper-cpp",
             "/opt/homebrew/bin/main", "/usr/local/bin/main"
         ]
-        return possibleBins.contains { FileManager.default.isExecutableFile(atPath: $0) }
+        return possibleBins.contains { path in
+            let url = URL(fileURLWithPath: path).resolvingSymlinksInPath()
+            return FileManager.default.fileExists(atPath: url.path) && FileManager.default.isExecutableFile(atPath: url.path)
+        }
     }
 
     private func installWhisperCpp() {

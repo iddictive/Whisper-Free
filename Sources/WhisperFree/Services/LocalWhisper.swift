@@ -88,15 +88,17 @@ final class LocalWhisper: TranscriptionEngine, @unchecked Sendable {
         let possiblePaths = [
             "/opt/homebrew/bin/whisper-cli",
             "/usr/local/bin/whisper-cli",
+            "/opt/homebrew/Cellar/whisper-cpp/1.8.3/bin/whisper-cli",
             "/opt/homebrew/bin/whisper-cpp",
             "/usr/local/bin/whisper-cpp",
-            "/opt/homebrew/bin/main",  // whisper.cpp built from source
+            "/opt/homebrew/bin/main",
             "/usr/local/bin/main"
         ]
 
         for path in possiblePaths {
-            if FileManager.default.isExecutableFile(atPath: path) {
-                return path
+            let url = URL(fileURLWithPath: path).resolvingSymlinksInPath()
+            if FileManager.default.fileExists(atPath: url.path) && FileManager.default.isExecutableFile(atPath: url.path) {
+                return url.path
             }
         }
 

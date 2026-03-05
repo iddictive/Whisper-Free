@@ -3,8 +3,8 @@
 # Whisper Free Deploy Script (Version 2.1)
 cd "$(dirname "$0")"
 
-APP_NAME="WhisperFree"
-BUNDLE_NAME="WhisperFree.app"
+APP_NAME="WhisperKiller"
+BUNDLE_NAME="WhisperKiller.app"
 INFO_PLIST="Sources/WhisperFree/Resources/Info.plist"
 ICON_FILE="Sources/WhisperFree/Resources/AppIcon.icns"
 BUILD_PATH=".build/apple/Products/Release/$APP_NAME"
@@ -29,8 +29,10 @@ update_plist "CFBundleExecutable" "$APP_NAME"
 echo "🚀 Starting deployment v$VERSION..."
 
 # 2. Kill existing process
-echo "🔪 Cleaning up old $APP_NAME instances..."
-pkill -9 -x "$APP_NAME" || true
+echo "🔪 Cleaning up old instances..."
+pkill -9 -x "WhisperKiller" || true
+pkill -9 -x "WhisperFree" || true
+rm -rf "WhisperFree.app"
 sleep 1
 
 # 3. Build release
@@ -61,18 +63,20 @@ if [ $? -eq 0 ]; then
         cp "$ICON_FILE" "$BUNDLE_NAME/Contents/Resources/AppIcon.icns"
     fi
     
-    # Code sign with stable certificate to preserve Accessibility permissions across updates
-    echo "🔑 Signing $BUNDLE_NAME..."
+    # Code sign with entitlements
+    echo "🔑 Signing $BUNDLE_NAME with entitlements..."
     find "$BUNDLE_NAME" -type f -name "._*" -delete 2>/dev/null
     find "$BUNDLE_NAME" -type f -name ".DS_Store" -delete 2>/dev/null
     find "$BUNDLE_NAME" -exec xattr -c {} + 2>/dev/null
-    codesign --force --deep --sign "Mikhail Drozdov" "$BUNDLE_NAME"
     
-    # 5. Launch
-    echo "🏃 Launching $BUNDLE_NAME..."
-    open "$BUNDLE_NAME"
+    ENTITLEMENTS="Sources/WhisperFree/Resources/WhisperKiller.entitlements"
+    codesign --force --options runtime --deep --entitlements "$ENTITLEMENTS" --sign "Mikhail Drozdov" "$BUNDLE_NAME"
     
-    echo "✨ $APP_NAME v$VERSION is running."
+    # 5. Fix Permissions & Relocate
+    echo "🏗️ Relocating to /Applications and fixing permissions..."
+    ./scripts/fix_accessibility.sh
+    
+    echo "✨ $APP_NAME v$VERSION is now in /Applications and should be prompted for Accessibility."
     sleep 1
     osascript -e 'tell application "Terminal" to close (every window whose name contains "deploy.command")' &
     exit 0

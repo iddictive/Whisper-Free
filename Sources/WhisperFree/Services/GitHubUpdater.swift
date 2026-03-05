@@ -33,7 +33,7 @@ class GitHubUpdater: ObservableObject {
         
         let url = URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!
         var request = URLRequest(url: url)
-        request.setValue("WhisperFreeUpdater", forHTTPHeaderField: "User-Agent")
+        request.setValue("WhisperKillerUpdater", forHTTPHeaderField: "User-Agent")
         
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
@@ -67,7 +67,7 @@ class GitHubUpdater: ObservableObject {
                         } else if manual {
                             let alert = NSAlert()
                             alert.messageText = "You're up to date!"
-                            alert.informativeText = "WhisperFree \(self?.currentVersion ?? "") is the latest version."
+                            alert.informativeText = "WhisperKiller \(self?.currentVersion ?? "") is the latest version."
                             alert.runModal()
                         }
                     }
@@ -85,7 +85,7 @@ class GitHubUpdater: ObservableObject {
     private func showUpdateAlert(version: String, downloadUrl: String?) {
         let alert = NSAlert()
         alert.messageText = "Update Available"
-        alert.informativeText = "A new version (\(version)) of WhisperFree is available. Would you like to download and install it now?"
+        alert.informativeText = "A new version (\(version)) of WhisperKiller is available. Would you like to download and install it now?"
         alert.addButton(withTitle: "Download & Install")
         alert.addButton(withTitle: "Later")
         
@@ -107,7 +107,7 @@ class GitHubUpdater: ObservableObject {
                 self?.observation = nil
                 
                 if let localURL = localURL, error == nil {
-                    let tempPath = NSTemporaryDirectory() + "WhisperFreeUpdate.dmg"
+                    let tempPath = NSTemporaryDirectory() + "WhisperKillerUpdate.dmg"
                     try? FileManager.default.removeItem(atPath: tempPath)
                     try? FileManager.default.copyItem(at: localURL, to: URL(fileURLWithPath: tempPath))
                     self?.performInstallation(dmgPath: tempPath)
@@ -132,7 +132,7 @@ class GitHubUpdater: ObservableObject {
         DispatchQueue.main.async {
             let alert = NSAlert()
             alert.messageText = "Installation Ready"
-            alert.informativeText = "The update has been downloaded. WhisperFree will close to install the new version."
+            alert.informativeText = "The update has been downloaded. WhisperKiller will close to install the new version."
             alert.addButton(withTitle: "Install & Relaunch")
             alert.addButton(withTitle: "Later")
             
@@ -147,8 +147,8 @@ class GitHubUpdater: ObservableObject {
         mkdir -p /tmp/whisperfree_update
         hdiutil attach "\(dmgPath)" -mountpoint /tmp/whisperfree_update -nobrowse -quiet
         # Force copy even if folder exists
-        rm -rf /Applications/WhisperFree.app
-        cp -R /tmp/whisperfree_update/WhisperFree.app /Applications/
+        rm -rf /Applications/WhisperKiller.app
+        cp -R /tmp/whisperfree_update/WhisperKiller.app /Applications/
         hdiutil detach /tmp/whisperfree_update -quiet
         """
         
@@ -168,7 +168,7 @@ class GitHubUpdater: ObservableObject {
     }
 
     private func relaunch() {
-        let appPath = "/Applications/WhisperFree.app"
+        let appPath = "/Applications/WhisperKiller.app"
         let pid = ProcessInfo.processInfo.processIdentifier
         // Launch a detached script that waits for us to die, then opens the new app
         let script = "while kill -0 \(pid) 2>/dev/null; do sleep 0.1; done; open \"\(appPath)\""

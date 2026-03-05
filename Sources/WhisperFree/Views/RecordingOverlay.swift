@@ -34,53 +34,38 @@ struct WaveformView: View {
 struct RecordingOverlayContent: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var recorder: AudioRecorder
+    
     @State private var pulse = false
 
     var body: some View {
         HStack(spacing: 12) {
-            // Status Indicator — smooth pulse
             ZStack {
                 Circle()
                     .fill(statusColor.opacity(0.3))
                     .frame(width: 8, height: 8)
                     .scaleEffect(appState.state == .recording && pulse ? 1.4 : 1.0)
-                
                 Circle()
                     .fill(statusColor)
                     .frame(width: 8, height: 8)
             }
             .opacity(appState.state == .processing || appState.state == .typing ? (pulse ? 1.0 : 0.3) : 1.0)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                    pulse = true
-                }
-            }
 
             if appState.state == .recording {
                 WaveformView(levels: recorder.audioLevels)
-                    .transition(.opacity.combined(with: .move(edge: .leading)))
                 
                 if recorder.isTooQuiet {
                     HStack(spacing: 3) {
-                        Image(systemName: "speaker.slash.fill")
-                            .font(.system(size: 9))
-                        Text("Low")
-                            .font(.system(size: 10, weight: .bold))
+                        Image(systemName: "speaker.slash.fill").font(.system(size: 9))
+                        Text("Low").font(.system(size: 10, weight: .bold))
                     }
-                    .foregroundStyle(.orange)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
+                    .foregroundStyle(.orange).padding(.horizontal, 7).padding(.vertical, 3)
                     .background(Capsule().fill(.orange.opacity(0.15)))
                 } else if recorder.isTooNoisy {
                     HStack(spacing: 3) {
-                        Image(systemName: "waveform.badge.exclamationmark")
-                            .font(.system(size: 9))
-                        Text("Noise")
-                            .font(.system(size: 10, weight: .bold))
+                        Image(systemName: "waveform.badge.exclamationmark").font(.system(size: 9))
+                        Text("Noise").font(.system(size: 10, weight: .bold))
                     }
-                    .foregroundStyle(.red)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
+                    .foregroundStyle(.red).padding(.horizontal, 7).padding(.vertical, 3)
                     .background(Capsule().fill(.red.opacity(0.15)))
                 }
 
@@ -91,24 +76,14 @@ struct RecordingOverlayContent: View {
                 Text(appState.state == .processing ? appState.processingStage.rawValue : "Typing...")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
-                    .transition(.opacity)
             } else {
-                Text(statusText)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
-                    .transition(.opacity)
+                Text(statusText).font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
             }
             
-            // The right-side indicator is removed, and the error button is moved here.
             if let _ = appState.lastError {
-                Button {
-                    appState.lastError = nil
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.6))
-                }
-                .buttonStyle(.plain)
+                Button { appState.lastError = nil } label: {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 14)).foregroundStyle(.white.opacity(0.6))
+                }.buttonStyle(.plain)
             }
         }
         .padding(.horizontal, 20)
@@ -116,42 +91,40 @@ struct RecordingOverlayContent: View {
         .fixedSize()
         .background(
             ZStack {
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                Capsule()
-                    .fill(Color.black.opacity(0.45))
-                Capsule()
-                    .strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
+                Capsule().fill(.ultraThinMaterial)
+                Capsule().fill(Color.black.opacity(0.45))
+                Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
             }
         )
         .clipShape(Capsule())
         .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
         .environment(\.colorScheme, .dark)
-        .padding(12) // Extra padding so the panel window has room for the shadow
+        .padding(12)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+        }
     }
 
     private var statusColor: Color {
-        if appState.lastError != nil { return .red }
+        if let _ = appState.lastError { return .red }
         switch appState.state {
         case .recording: return .red
         case .processing: return .orange
-        case .typing: return SW.accent
-        default: return .clear
+        case .typing: return .blue
+        case .idle: return .gray
         }
     }
 
     private var statusText: String {
-        if appState.lastError != nil { return "ERROR" }
+        if let error = appState.lastError { return error }
         switch appState.state {
-        case .recording: return "REC"
-        case .processing: return "AI..."
-        case .typing: return "TYP"
-        default: return ""
+        case .recording: return "Recording..."
+        case .processing: return appState.processingStage.rawValue
+        case .typing: return "Typing..."
+        case .idle: return ""
         }
-    }
-
-    private var isPulsing: Bool {
-        appState.state == .recording || appState.state == .processing
     }
 
     private func formatDuration(_ duration: TimeInterval) -> String {
@@ -185,13 +158,10 @@ final class OverlayWindowController: NSObject, ObservableObject {
         let hostingView = NSHostingView(rootView: content)
         hostingView.translatesAutoresizingMaskIntoConstraints = false
 
-        // Use a generous fixed panel size — SwiftUI content is .fixedSize() 
-        // and centers itself, so we never need to resize the panel.
         guard let screen = NSScreen.main else { return }
         let panelWidth: CGFloat = 500
         let panelHeight: CGFloat = 80
-        // Use visibleFrame to stay below the notch / menu bar
-        let safeTop = screen.frame.maxY - screen.visibleFrame.maxY  // height of menu bar / notch area
+        let safeTop = screen.frame.maxY - screen.visibleFrame.maxY
         let x = screen.frame.midX - (panelWidth / 2)
         let y = screen.frame.maxY - panelHeight - safeTop - 4
 
@@ -202,7 +172,6 @@ final class OverlayWindowController: NSObject, ObservableObject {
             defer: false
         )
         panel.isFloatingPanel = true
-        // statusBar level sits above normal windows but doesn't fight the app switcher
         panel.level = .statusBar
         panel.backgroundColor = .clear
         panel.isOpaque = false
@@ -211,11 +180,8 @@ final class OverlayWindowController: NSObject, ObservableObject {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.isMovableByWindowBackground = false
         panel.hidesOnDeactivate = false
-        panel.ignoresMouseEvents = false
 
-        // Set hosting view as content and pin to edges for proper centering
         panel.contentView = hostingView
-
         self.panel = panel
         panel.orderFrontRegardless()
     }

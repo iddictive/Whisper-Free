@@ -10,22 +10,22 @@ build:
 
 # Build debug + run
 run:
-	swift run WhisperFree
+	swift run WhisperKiller
 
 # Create .app bundle from release build
 app: build
-	@mkdir -p WhisperFree.app/Contents/MacOS
-	@mkdir -p WhisperFree.app/Contents/Resources
-	@cp .build/release/WhisperFree WhisperFree.app/Contents/MacOS/
-	@cp Sources/WhisperFree/Resources/Info.plist WhisperFree.app/Contents/
-	@cp Sources/WhisperFree/Resources/AppIcon.icns WhisperFree.app/Contents/Resources/
-	@echo "✅ WhisperFree.app created"
-	@echo "   Run: open WhisperFree.app"
+	@mkdir -p WhisperKiller.app/Contents/MacOS
+	@mkdir -p WhisperKiller.app/Contents/Resources
+	@cp .build/release/WhisperKiller WhisperKiller.app/Contents/MacOS/
+	@cp Sources/WhisperFree/Resources/Info.plist WhisperKiller.app/Contents/
+	@cp Sources/WhisperFree/Resources/AppIcon.icns WhisperKiller.app/Contents/Resources/
+	@echo "✅ WhisperKiller.app created"
+	@echo "   Run: open WhisperKiller.app"
 
 # Clean build artifacts
 clean:
 	swift package clean
-	rm -rf WhisperFree.app
+	rm -rf WhisperKiller.app
 
 # Open in Xcode
 xcode:

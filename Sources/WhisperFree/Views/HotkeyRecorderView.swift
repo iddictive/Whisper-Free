@@ -67,6 +67,9 @@ struct KeyEventView: NSViewRepresentable {
         if let view = nsView as? RecordingNSView {
             view.isRecording = isRecording
             if isRecording {
+                // Ensure the app is active and this view is first responder to catch keys
+                NSApp.activate(ignoringOtherApps: true)
+                view.window?.makeKeyAndOrderFront(nil)
                 view.window?.makeFirstResponder(view)
             }
         }

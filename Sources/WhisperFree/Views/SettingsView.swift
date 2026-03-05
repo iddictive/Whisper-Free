@@ -294,10 +294,27 @@ struct SettingsView: View {
                                         .foregroundStyle(.red)
                                 }
                                 .buttonStyle(.plain)
-                            } else if modelManager.isDownloading(size) {
-                                ProgressView(value: modelManager.activeDownloads[size.rawValue]?.progress ?? 0)
-                                    .progressViewStyle(.linear)
-                                    .frame(width: 80)
+                            } else if let state = modelManager.activeDownloads[size.rawValue] {
+                                if let error = state.error {
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("Error").font(.caption2).foregroundStyle(.red)
+                                        Button("Retry") {
+                                            modelManager.downloadModel(size)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .font(.caption2)
+                                        .foregroundStyle(SW.accent)
+                                    }
+                                } else if state.isPreparing {
+                                    HStack(spacing: 4) {
+                                        ProgressView().controlSize(.mini)
+                                        Text("Preparing...").font(.caption2).foregroundStyle(.secondary)
+                                    }
+                                } else {
+                                    ProgressView(value: state.progress)
+                                        .progressViewStyle(.linear)
+                                        .frame(width: 80)
+                                }
                             } else {
                                 Button("Download") {
                                     modelManager.downloadModel(size)

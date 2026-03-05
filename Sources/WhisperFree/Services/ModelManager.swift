@@ -8,6 +8,7 @@ final class ModelManager: NSObject, ObservableObject, URLSessionDownloadDelegate
     struct DownloadState {
         var progress: Double = 0
         var error: String?
+        var isPreparing: Bool = false
     }
 
     private var tasks: [URLSessionDownloadTask: LocalModelSize] = [:]
@@ -24,6 +25,7 @@ final class ModelManager: NSObject, ObservableObject, URLSessionDownloadDelegate
     }
 
     func refreshDownloadedModels() {
+        objectWillChange.send()
         var models = Set<String>()
         for size in LocalModelSize.allCases {
             if findModelPath(for: size) != nil {
@@ -45,14 +47,23 @@ final class ModelManager: NSObject, ObservableObject, URLSessionDownloadDelegate
         let homeDir = FileManager.default.homeDirectoryForCurrentUser
         let systemPaths = [
             "/opt/homebrew/share/whisper-cpp/models/\(size.fileName)",
+            "/opt/homebrew/share/whisper.cpp/models/\(size.fileName)",
+            "/opt/homebrew/share/whisper-cpp/\(size.fileName)",
+            "/opt/homebrew/share/whisper.cpp/\(size.fileName)",
             "/usr/local/share/whisper-cpp/models/\(size.fileName)",
+            "/usr/local/share/whisper.cpp/models/\(size.fileName)",
+            homeDir.appendingPathComponent("Library/Containers/com.whisperfree.app/Data/Library/Application Support/WhisperKiller/Models/\(size.fileName)").path,
+            homeDir.appendingPathComponent("Library/Containers/com.whisperfree.app/Data/Library/Application Support/WhisperFree/Models/\(size.fileName)").path,
+            homeDir.appendingPathComponent("Library/Application Support/WhisperFree/Models/\(size.fileName)").path,
             homeDir.appendingPathComponent("Library/Application Support/superwhisper/Models/\(size.fileName)").path,
             homeDir.appendingPathComponent(".cache/whisper/\(size.fileName)").path
         ]
 
         for path in systemPaths {
-            if FileManager.default.fileExists(atPath: path) {
-                return URL(fileURLWithPath: path)
+            // Use resolvingSymlinksInPath to handle Homebrew alias/symlink messes
+            let url = URL(fileURLWithPath: path).resolvingSymlinksInPath()
+            if FileManager.default.fileExists(atPath: url.path) {
+                return url
             }
         }
 
@@ -82,7 +93,9 @@ final class ModelManager: NSObject, ObservableObject, URLSessionDownloadDelegate
     func downloadModel(_ size: LocalModelSize) {
         guard activeDownloads[size.rawValue] == nil else { return }
 
-        activeDownloads[size.rawValue] = DownloadState()
+        // Ensure UI knows we are starting immediately
+        objectWillChange.send()
+        activeDownloads[size.rawValue] = DownloadState(isPreparing: true)
 
         let task = session.downloadTask(with: size.downloadURL)
         tasks[task] = size
@@ -120,6 +133,9 @@ final class ModelManager: NSObject, ObservableObject, URLSessionDownloadDelegate
                     totalBytesExpectedToWrite: Int64) {
         guard let size = tasks[downloadTask] else { return }
         if totalBytesExpectedToWrite > 0 {
+            if activeDownloads[size.rawValue]?.isPreparing == true {
+                activeDownloads[size.rawValue]?.isPreparing = false
+            }
             activeDownloads[size.rawValue]?.progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
         }
     }

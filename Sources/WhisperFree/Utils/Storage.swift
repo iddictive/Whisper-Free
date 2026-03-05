@@ -76,7 +76,7 @@ final class Storage {
 
     static var modelsDirectory: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? FileManager.default.temporaryDirectory
-        let dir = appSupport.appendingPathComponent("WhisperFree/Models", isDirectory: true)
+        let dir = appSupport.appendingPathComponent("WhisperKiller/Models", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
