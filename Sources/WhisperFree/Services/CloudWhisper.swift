@@ -137,6 +137,11 @@ final class CloudWhisper: TranscriptionEngine {
 
         var body = Data()
         body.appendMultipart(boundary: boundary, name: "model", value: "whisper-1")
+        
+        // Suppress hallucinations (Subeditor credits, "To be continued" repetitions)
+        let suppressionPrompt = "Чистая расшифровка разговора без указания редакторов, корректоров и субтитров. Не писать слово 'Продолжение следует'. Clean transcription without any subeditor or proofreader credits."
+        body.appendMultipart(boundary: boundary, name: "prompt", value: suppressionPrompt)
+        
         if let lang = language, lang != "auto" {
             body.appendMultipart(boundary: boundary, name: "language", value: lang)
         }
