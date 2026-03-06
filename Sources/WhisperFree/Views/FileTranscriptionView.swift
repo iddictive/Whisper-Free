@@ -315,7 +315,7 @@ struct FileTranscriptionView: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
 
-            if appState.settings.engineType == .cloud && appState.settings.enablePostProcessing {
+            if appState.settings.engineType == .cloud {
                 Toggle(isOn: $appState.settings.enableSpeakerDiarization) {
                     Text("Diarization")
                         .font(.system(size: 10, weight: .medium))
@@ -425,6 +425,24 @@ struct FileTranscriptionView: View {
                         Text("Total: ~$\(String(format: "%.2f", totalCost))")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.secondary)
+                    }
+                }
+
+                if !queueItems.isEmpty {
+                    let queuedCount = queueItems.filter { $0.status == .queued }.count
+                    if queuedCount > 0 {
+                        Button {
+                            startAllQueued()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "play.fill")
+                                Text("Start All (\(queuedCount))")
+                            }
+                            .font(.system(size: 11, weight: .bold))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .tint(.green)
                     }
                 }
 
@@ -567,7 +585,7 @@ struct FileTranscriptionView: View {
                 await item.loadDuration()
             }
         }
-        processNextInQueue()
+        // processNextInQueue() removed to wait for user confirmation
     }
 
     private func processNextInQueue() {
@@ -608,6 +626,11 @@ struct FileTranscriptionView: View {
 
     private func clearCompleted() {
         queueItems.removeAll { $0.status == .done }
+    }
+
+    private func startAllQueued() {
+        guard !isProcessing else { return }
+        processNextInQueue()
     }
 }
 
@@ -699,6 +722,32 @@ struct QueueCardView: View {
                     .foregroundStyle(.secondary.opacity(0.5))
             }
             .buttonStyle(.plain)
+        } else if item.status == .queued {
+            HStack(spacing: 6) {
+                Button {
+                    item.startTranscription(settings: AppState.shared.settings, appState: AppState.shared)
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 8))
+                        Text("Start")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.green.opacity(0.1))
+                    .foregroundStyle(.green)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+
+                Button(action: onCancel) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+            }
         } else {
             Button(action: onCancel) {
                 Image(systemName: "xmark.circle.fill")
