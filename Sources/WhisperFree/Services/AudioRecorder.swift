@@ -18,6 +18,8 @@ final class AudioRecorder: ObservableObject {
     private var startTime: Date?
     private let levelHistoryCount = 30
     private var recentLevels: [Float] = []
+    private var smoothedDisplayLevel: Float = 0
+    private var estimatedNoiseFloorDb: Float = -55
     
     // Lightweight monitor mode (for Settings live meter)
     private var monitorEngine: AVAudioEngine?
@@ -34,6 +36,7 @@ final class AudioRecorder: ObservableObject {
         isTooNoisy = false
         isMicrophoneDenied = false
         recentLevels.removeAll()
+        resetLevelTracking()
         
         // 1. Check Microphone Permissions
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
@@ -325,6 +328,8 @@ final class AudioRecorder: ObservableObject {
                 self.audioLevels = Array(repeating: 0, count: self.levelHistoryCount)
                 self.recentLevels.removeAll()
                 self.isTooQuiet = false
+                self.isTooNoisy = false
+                self.resetLevelTracking()
                 print("whisper_debug: Monitor mode started successfully")
             }
         } catch {
@@ -347,6 +352,7 @@ final class AudioRecorder: ObservableObject {
                 self.recentLevels.removeAll()
                 self.isTooQuiet = false
                 self.isTooNoisy = false
+                self.resetLevelTracking()
                 print("whisper_debug: Monitor mode stopped")
             }
         }
@@ -362,6 +368,7 @@ final class AudioRecorder: ObservableObject {
     private func calculateLevel(buffer: AVAudioPCMBuffer) -> Float {
         guard let channelData = buffer.floatChannelData?[0] else { return 0 }
         let frames = Int(buffer.frameLength)
+        guard frames > 0 else { return 0 }
         
         var sumSquares: Float = 0
         for i in 0..<frames {
@@ -369,11 +376,35 @@ final class AudioRecorder: ObservableObject {
             sumSquares += sample * sample
         }
         
-        let rms = sqrt(sumSquares / Float(max(frames, 1)))
-        
-        // Noise floor subtraction and strong amplification (standard professional approach)
-        let adjustedRms = max(0, rms - 0.0005)
-        return min(adjustedRms * 60.0, 1.0)
+        let rms = sqrt(sumSquares / Float(frames))
+        let safeRms = max(rms, 1e-7)
+        let levelDb = 20 * log10(safeRms)
+
+        // Update the estimated noise floor only near the quiet end so speech does not
+        // drag the baseline upward and compress the meter into saturation.
+        let noiseTrackingThreshold = estimatedNoiseFloorDb + 8
+        if levelDb < noiseTrackingThreshold {
+            estimatedNoiseFloorDb = min(max((estimatedNoiseFloorDb * 0.92) + (levelDb * 0.08), -70), -38)
+        }
+
+        let gateDb = estimatedNoiseFloorDb + 6
+        let speechCeilingDb: Float = -12
+        let normalized = max(0, min((levelDb - gateDb) / (speechCeilingDb - gateDb), 1))
+        let shapedLevel = sqrt(normalized)
+
+        let smoothing: Float = shapedLevel > smoothedDisplayLevel ? 0.35 : 0.18
+        smoothedDisplayLevel += (shapedLevel - smoothedDisplayLevel) * smoothing
+
+        if smoothedDisplayLevel < 0.015 {
+            smoothedDisplayLevel = 0
+        }
+
+        return smoothedDisplayLevel
+    }
+
+    private func resetLevelTracking() {
+        smoothedDisplayLevel = 0
+        estimatedNoiseFloorDb = -55
     }
 
     private func findDeviceID(uniqueID: String) -> AudioDeviceID? {

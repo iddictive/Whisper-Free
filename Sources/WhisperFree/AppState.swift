@@ -627,7 +627,11 @@ final class AppState: ObservableObject {
 
     func updateTranscriptionText(entry: TranscriptionHistoryEntry, newText: String) {
         var updatedEntry = entry
-        updatedEntry.processedText = newText
+        if updatedEntry.summaryText?.isEmpty == false {
+            updatedEntry.summaryText = newText
+        } else {
+            updatedEntry.processedText = newText
+        }
         
         // If it has an associated audio file, we could rename it too, 
         // but that might break references if not careful. 
@@ -637,6 +641,35 @@ final class AppState: ObservableObject {
             history[index] = updatedEntry
             Storage.shared.updateTranscriptionHistoryEntry(updatedEntry)
         }
+    }
+
+    func saveSummary(entryId: UUID, summary: String, usage: UsageLog?) {
+        guard let index = history.firstIndex(where: { $0.entryId == entryId }) else { return }
+
+        history[index].summaryText = summary
+
+        if let usage {
+            if let existingUsage = history[index].usage {
+                history[index].usage = UsageLog(
+                    date: usage.date,
+                    modeName: existingUsage.modeName,
+                    engine: usage.engine,
+                    promptTokens: existingUsage.promptTokens + usage.promptTokens,
+                    completionTokens: existingUsage.completionTokens + usage.completionTokens,
+                    totalTokens: existingUsage.totalTokens + usage.totalTokens,
+                    estimatedCost: existingUsage.estimatedCost + usage.estimatedCost,
+                    audioDurationSeconds: existingUsage.audioDurationSeconds ?? usage.audioDurationSeconds
+                )
+            } else {
+                history[index].usage = usage
+            }
+
+            settings.usageLogs.append(usage)
+            cleanupOldLogs()
+            saveSettings()
+        }
+
+        Storage.shared.updateTranscriptionHistoryEntry(history[index])
     }
 
     private func cleanupOldLogs() {

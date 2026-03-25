@@ -94,25 +94,32 @@ final class LocalTranslationEngine {
     
     // Translate text
     func translate(text: String, targetLanguage: String, model: String) async throws -> String {
+        let systemPrompt = "You are a professional real-time translator. Translate the following transcription into \(targetLanguage). Ensure the translation sounds natural in \(targetLanguage). Provide ONLY the translation without any explanations, comments, or conversational text. Never output any markdown formatting."
+        return try await chat(systemPrompt: systemPrompt, userText: text, model: model, temperature: 0.3)
+    }
+
+    func chat(systemPrompt: String, userText: String, model: String, temperature: Double = 0.3) async throws -> String {
         guard await isRunning() else {
             throw LocalTranslationError.notRunning
+        }
+
+        guard await checkModelExists(name: model) else {
+            throw LocalTranslationError.translationFailed("Model '\(model)' is not available in Ollama. Download it in Live Translator settings first.")
         }
         
         var request = URLRequest(url: baseURL.appendingPathComponent("chat"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let systemPrompt = "You are a professional real-time translator. Translate the following transcription into \(targetLanguage). Ensure the translation sounds natural in \(targetLanguage). Provide ONLY the translation without any explanations, comments, or conversational text. Never output any markdown formatting."
-        
         let payload: [String: Any] = [
             "model": model,
             "messages": [
                 ["role": "system", "content": systemPrompt],
-                ["role": "user", "content": text]
+                ["role": "user", "content": userText]
             ],
             "stream": false,
             "options": [
-                "temperature": 0.3
+                "temperature": temperature
             ]
         ]
         

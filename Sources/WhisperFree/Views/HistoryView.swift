@@ -18,6 +18,7 @@ struct HistoryView: View {
         return appState.history.filter {
             $0.rawText.localizedCaseInsensitiveContains(searchText) ||
             $0.processedText.localizedCaseInsensitiveContains(searchText) ||
+            ($0.summaryText?.localizedCaseInsensitiveContains(searchText) ?? false) ||
             $0.modeName.localizedCaseInsensitiveContains(searchText)
         }
     }
@@ -244,6 +245,16 @@ struct HistoryView: View {
                     .padding(.vertical, 3)
                     .background(Color.orange.opacity(0.15))
                     .foregroundStyle(.orange)
+                .clipShape(Capsule())
+            }
+
+            if entry.summaryText?.isEmpty == false {
+                Text("SUMMARY")
+                    .font(.system(size: 9, weight: .bold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.cyan.opacity(0.15))
+                    .foregroundStyle(.cyan)
                     .clipShape(Capsule())
             }
 
@@ -257,7 +268,7 @@ struct HistoryView: View {
 
     private func rowContent(_ entry: TranscriptionHistoryEntry) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(entry.processedText)
+            Text(entry.summaryText ?? entry.processedText)
                 .font(.system(size: 13, weight: .medium))
                 .lineLimit(expandedEntryId == entry.entryId ? nil : 3)
                 .onTapGesture {
@@ -266,19 +277,36 @@ struct HistoryView: View {
                     }
                 }
 
-            if expandedEntryId == entry.entryId && entry.rawText != entry.processedText {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("RAW TRANSCRIPTION")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(.secondary)
-                    Text(entry.rawText)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+            if expandedEntryId == entry.entryId {
+                if let summary = entry.summaryText, !summary.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("TRANSCRIPT")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.secondary)
+                        Text(entry.processedText)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.primary.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.primary.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                if entry.rawText != entry.processedText {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("RAW TRANSCRIPTION")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.secondary)
+                        Text(entry.rawText)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.primary.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
             }
         }
     }
@@ -287,7 +315,7 @@ struct HistoryView: View {
         HStack(spacing: 12) {
             Button {
                 NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(entry.processedText, forType: .string)
+                NSPasteboard.general.setString(entry.summaryText ?? entry.processedText, forType: .string)
             } label: {
                 Label("Copy", systemImage: "doc.on.doc.fill")
                     .font(.system(size: 11, weight: .bold))
@@ -296,7 +324,7 @@ struct HistoryView: View {
             .foregroundStyle(.cyan)
             
             Button {
-                newTranscriptionText = entry.processedText
+                newTranscriptionText = entry.summaryText ?? entry.processedText
                 renamingEntry = entry
             } label: {
                 Label("Rename", systemImage: "pencil")
@@ -304,6 +332,18 @@ struct HistoryView: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.purple)
+
+            if entry.summaryText?.isEmpty == false {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(entry.processedText, forType: .string)
+                } label: {
+                    Label("Transcript", systemImage: "text.alignleft")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
 
             if let path = entry.audioFilePath, FileManager.default.fileExists(atPath: path) {
                 Button {

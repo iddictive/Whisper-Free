@@ -2,11 +2,12 @@ import Foundation
 
 enum PostProcessingEngine: String, Codable, CaseIterable {
     case openai = "OpenAI"
+    case ollama = "Ollama"
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let rawValue = try container.decode(String.self)
-        self = rawValue == Self.openai.rawValue ? .openai : .openai
+        self = rawValue == Self.ollama.rawValue ? .ollama : .openai
     }
 }
 
@@ -131,9 +132,14 @@ struct UsageLog: Codable, Identifiable {
     
     // Estimates based on gpt-4o-mini ($0.15 / 1M input, $0.60 / 1M output)
     static func estimateCost(prompt: Int, completion: Int, engine: PostProcessingEngine) -> Double {
-        let pRate = 0.15 / 1_000_000.0
-        let cRate = 0.60 / 1_000_000.0
-        return Double(prompt) * pRate + Double(completion) * cRate
+        switch engine {
+        case .openai:
+            let pRate = 0.15 / 1_000_000.0
+            let cRate = 0.60 / 1_000_000.0
+            return Double(prompt) * pRate + Double(completion) * cRate
+        case .ollama:
+            return 0
+        }
     }
     
     // Estimates based on Whisper API ($0.006 / minute = $0.0001 / second)
@@ -147,6 +153,7 @@ struct TranscriptionHistoryEntry: Codable {
     let date: Date
     let rawText: String
     var processedText: String
+    var summaryText: String? = nil
     let modeName: String
     let duration: TimeInterval
     let engineUsed: String
@@ -154,11 +161,12 @@ struct TranscriptionHistoryEntry: Codable {
     var isFromFileImport: Bool = false
     var audioFilePath: String? = nil
 
-    init(rawText: String, processedText: String, modeName: String, duration: TimeInterval, engineUsed: String, usage: UsageLog? = nil, isFromFileImport: Bool = false, audioFilePath: String? = nil) {
+    init(rawText: String, processedText: String, summaryText: String? = nil, modeName: String, duration: TimeInterval, engineUsed: String, usage: UsageLog? = nil, isFromFileImport: Bool = false, audioFilePath: String? = nil) {
         self.entryId = UUID()
         self.date = Date()
         self.rawText = rawText
         self.processedText = processedText
+        self.summaryText = summaryText
         self.modeName = modeName
         self.duration = duration
         self.engineUsed = engineUsed
@@ -542,6 +550,10 @@ struct AppSettings: Codable {
 
     var hasOpenAIAPIKey: Bool {
         !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var hasConfiguredLocalFollowUpModel: Bool {
+        !liveTranslatorLocalModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var canUseSpeakerDiarization: Bool {

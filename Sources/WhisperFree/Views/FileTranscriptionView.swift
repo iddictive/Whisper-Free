@@ -60,6 +60,8 @@ final class QueueItem: ObservableObject, Identifiable {
     @Published var status: QueueItemStatus = .queued
     @Published var progress: Float = 0
     @Published var result: String?
+    @Published var rawResult: String?
+    @Published var summary: String?
     @Published var estimatedCost: Double?
     @Published var rangeStart: Double = 0
     @Published var rangeEnd: Double = 0
@@ -70,6 +72,10 @@ final class QueueItem: ObservableObject, Identifiable {
     // Replace hardcoded durations with dynamic file timestamps (completed)
     @Published var transcriptionSpeed: Double? // e.g., 12x realtime
     @Published var isExpanded = false
+    @Published var isSummarizing = false
+    @Published var summaryError: String?
+
+    var historyEntryID: UUID?
 
     var selectedDuration: TimeInterval {
         guard let total = durationSeconds else { return 0 }
@@ -195,7 +201,10 @@ final class QueueItem: ObservableObject, Identifiable {
                 }
 
                 await MainActor.run {
+                    self.rawResult = text
                     self.result = processedText
+                    self.summary = nil
+                    self.summaryError = nil
                     self.status = .done
                     self.progress = 1.0
                     self.isExpanded = true
@@ -218,6 +227,7 @@ final class QueueItem: ObservableObject, Identifiable {
                         usage: usage,
                         isFromFileImport: true
                     )
+                    self.historyEntryID = entry.entryId
                     Storage.shared.addTranscriptionHistoryEntry(entry)
                     appState.history.insert(entry, at: 0)
                 }
@@ -227,6 +237,56 @@ final class QueueItem: ObservableObject, Identifiable {
                         self.status = .error(error.localizedDescription)
                     }
                     self.progress = 0
+                }
+            }
+        }
+    }
+
+    func summarize(appState: AppState) {
+        guard !isSummarizing else { return }
+
+        let sourceText = (rawResult ?? result ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sourceText.isEmpty else {
+            summaryError = "Nothing to summarize yet."
+            return
+        }
+
+        isSummarizing = true
+        summaryError = nil
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let processor = PostProcessor(settings: appState.settings)
+                let summaryResult = try await processor.summarizeTranscript(text: sourceText)
+                let totalTokens = summaryResult.promptTokens + summaryResult.completionTokens
+                let usage = totalTokens > 0 ? UsageLog(
+                    date: Date(),
+                    modeName: "Auto Summary",
+                    engine: summaryResult.engine.rawValue,
+                    promptTokens: summaryResult.promptTokens,
+                    completionTokens: summaryResult.completionTokens,
+                    totalTokens: totalTokens,
+                    estimatedCost: UsageLog.estimateCost(
+                        prompt: summaryResult.promptTokens,
+                        completion: summaryResult.completionTokens,
+                        engine: summaryResult.engine
+                    )
+                ) : nil
+
+                await MainActor.run {
+                    self.summary = summaryResult.text
+                    self.isSummarizing = false
+
+                    if let historyEntryID = self.historyEntryID {
+                        appState.saveSummary(entryId: historyEntryID, summary: summaryResult.text, usage: usage)
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.summaryError = error.localizedDescription
+                    self.isSummarizing = false
                 }
             }
         }
@@ -868,6 +928,7 @@ struct QueueCardView: View {
     @ObservedObject var item: QueueItem
     var onCancel: () -> Void
     var onRemove: () -> Void
+    @EnvironmentObject private var appState: AppState
 
     private var fileExtIcon: String {
         let ext = item.url.pathExtension.lowercased()
@@ -1133,28 +1194,85 @@ struct QueueCardView: View {
     private func resultContent(_ result: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             ScrollView {
-                Text(result)
-                    .font(.system(size: 11))
-                    .lineSpacing(3)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 10) {
+                    transcriptBlock(title: "Transcript", text: result)
+
+                    if let summary = item.summary, !summary.isEmpty {
+                        transcriptBlock(title: "Auto Summary", text: summary)
+                    }
+
+                    if let summaryError = item.summaryError, !summaryError.isEmpty {
+                        Text(summaryError)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.red)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxHeight: 140)
 
-            Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(result, forType: .string)
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "doc.on.doc")
-                    Text("Copy")
+            HStack(spacing: 8) {
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(result, forType: .string)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.on.doc")
+                        Text("Copy")
+                    }
+                    .font(.system(size: 10, weight: .medium))
                 }
-                .font(.system(size: 10, weight: .medium))
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Button {
+                    item.summarize(appState: appState)
+                } label: {
+                    HStack(spacing: 4) {
+                        if item.isSummarizing {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "sparkles")
+                        }
+                        Text(item.summary == nil ? "Summarize" : "Re-Summarize")
+                    }
+                    .font(.system(size: 10, weight: .medium))
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(item.isSummarizing)
+
+                if let summary = item.summary, !summary.isEmpty {
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(summary, forType: .string)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc.text")
+                            Text("Copy Summary")
+                        }
+                        .font(.system(size: 10, weight: .medium))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
         .padding(.top, 4)
+    }
+
+    private func transcriptBlock(title: String, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased())
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(.secondary)
+            Text(text)
+                .font(.system(size: 11))
+                .lineSpacing(3)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     // MARK: - Helpers
