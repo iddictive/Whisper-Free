@@ -41,6 +41,10 @@ struct TranscriptionMode: Codable, Identifiable, Hashable {
     let systemPrompt: String
     let isBuiltIn: Bool
 
+    var requiresAI: Bool {
+        !systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     static let raw = TranscriptionMode(
         name: "Raw",
         icon: "quote.opening",
@@ -196,25 +200,29 @@ struct TranscriptionHistoryEntry: Codable {
     var rawText: String
     var processedText: String
     var summaryText: String? = nil
+    var processingError: String? = nil
     var modeName: String
     let duration: TimeInterval
     var engineUsed: String
     var usage: UsageLog?
     var isFromFileImport: Bool = false
     var audioFilePath: String? = nil
+    var ownsAudioFile: Bool = false
 
-    init(rawText: String, processedText: String, summaryText: String? = nil, modeName: String, duration: TimeInterval, engineUsed: String, usage: UsageLog? = nil, isFromFileImport: Bool = false, audioFilePath: String? = nil) {
+    init(rawText: String, processedText: String, summaryText: String? = nil, processingError: String? = nil, modeName: String, duration: TimeInterval, engineUsed: String, usage: UsageLog? = nil, isFromFileImport: Bool = false, audioFilePath: String? = nil, ownsAudioFile: Bool = false) {
         self.entryId = UUID()
         self.date = Date()
         self.rawText = rawText
         self.processedText = processedText
         self.summaryText = summaryText
+        self.processingError = processingError
         self.modeName = modeName
         self.duration = duration
         self.engineUsed = engineUsed
         self.usage = usage
         self.isFromFileImport = isFromFileImport
         self.audioFilePath = audioFilePath
+        self.ownsAudioFile = ownsAudioFile
     }
 }
 
@@ -590,8 +598,12 @@ struct AppSettings: Codable {
         allModes.first { $0.name == selectedModeName } ?? .dictation
     }
 
+    var normalizedAPIKey: String {
+        apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var hasOpenAIAPIKey: Bool {
-        !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !normalizedAPIKey.isEmpty
     }
 
     var hasConfiguredLocalFollowUpModel: Bool {
@@ -618,6 +630,11 @@ struct AppSettings: Codable {
             return TranscriptionMode.raw.name
         }
         return currentName
+    }
+
+    mutating func normalizeBeforeSaving() {
+        apiKey = normalizedAPIKey
+        selectedModeName = validatedModeName(currentName: selectedModeName)
     }
 
     // Supported languages for Whisper

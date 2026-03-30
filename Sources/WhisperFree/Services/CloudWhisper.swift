@@ -167,11 +167,16 @@ final class CloudWhisper: TranscriptionEngine {
         }
 
         if httpResponse.statusCode == 401 {
-            throw TranscriptionError.networkError("Invalid API Key. Please check your OpenAI API key in Settings → General.")
+            throw TranscriptionError.networkError("Invalid API key. Please check your OpenAI API key in Settings → Engine & API.")
+        }
+
+        if httpResponse.statusCode == 429 {
+            let errorText = openAIErrorMessage(from: data) ?? "OpenAI quota exceeded. Check billing and project limits."
+            throw TranscriptionError.networkError(errorText)
         }
 
         if httpResponse.statusCode != 200 {
-            let errorText = String(data: data, encoding: .utf8) ?? "Unknown error"
+            let errorText = openAIErrorMessage(from: data) ?? String(data: data, encoding: .utf8) ?? "Unknown error"
             throw TranscriptionError.networkError("HTTP \(httpResponse.statusCode): \(errorText)")
         }
 
@@ -180,6 +185,15 @@ final class CloudWhisper: TranscriptionEngine {
         }
 
         return text
+    }
+
+    private func openAIErrorMessage(from data: Data) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let error = json["error"] as? [String: Any],
+              let message = error["message"] as? String else {
+            return nil
+        }
+        return message
     }
 
     // MARK: - File Preparation

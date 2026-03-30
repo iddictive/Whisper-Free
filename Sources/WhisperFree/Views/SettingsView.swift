@@ -8,16 +8,20 @@ struct SettingsView: View {
     @State private var selectedTab: String? = "app"
     
     // Custom Mode State
+    @State private var editingModeID: String?
     @State private var newModeName = ""
     @State private var newModeDescription = ""
     @State private var newModeExampleInput = ""
     @State private var newModeExampleOutput = ""
     @State private var newModePrompt = ""
     @State private var newModeIcon = "sparkles"
+    @State private var isGeneratingExample = false
+    @State private var modeEditorMessage: String?
     
     // API Testing State
-    @State private var isTestingAPI = false
-    @State private var apiTestResult: String?
+    @State private var apiValidationState: OpenAIAPIKeyValidationState = .idle
+    @State private var isRunningNetworkDiagnostics = false
+    @State private var networkDiagnosticLines: [String] = []
 
     private var appVersionText: String {
         let shortVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
@@ -33,6 +37,79 @@ struct SettingsView: View {
         default:
             return L.tr("Version Unknown", "Версия неизвестна")
         }
+    }
+
+    private var isEditingCustomMode: Bool {
+        editingModeID != nil
+    }
+
+    private var normalizedModeName: String {
+        newModeName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var normalizedModeDescription: String {
+        newModeDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var normalizedModeExampleInput: String {
+        newModeExampleInput.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var normalizedModeExampleOutput: String {
+        newModeExampleOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var normalizedModePrompt: String {
+        newModePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var duplicateModeExists: Bool {
+        appState.settings.allModes.contains {
+            $0.name.caseInsensitiveCompare(normalizedModeName) == .orderedSame && $0.id != editingModeID
+        }
+    }
+
+    private var canSaveMode: Bool {
+        !normalizedModeName.isEmpty && !normalizedModePrompt.isEmpty && !duplicateModeExists
+    }
+
+    private var apiValidationText: String? {
+        switch apiValidationState {
+        case .idle:
+            return appState.settings.hasOpenAIAPIKey
+                ? L.tr("Key not checked yet.", "Ключ ещё не проверен.")
+                : nil
+        case .checking:
+            return L.tr("Checking key…", "Проверяю ключ…")
+        case .valid:
+            return L.tr("Key is valid.", "Ключ валиден.")
+        case .invalid:
+            return L.tr("Key is invalid.", "Ключ невалиден.")
+        case .networkError(let message):
+            return L.tr("Could not reach OpenAI. \(message)", "Не удалось связаться с OpenAI. \(message)")
+        case .failed(let statusCode):
+            return L.tr("Validation failed (HTTP \(statusCode)).", "Проверка не удалась (HTTP \(statusCode)).")
+        }
+    }
+
+    private var apiValidationColor: Color {
+        switch apiValidationState {
+        case .valid:
+            return Color.accentColor
+        case .invalid, .networkError, .failed:
+            return .orange
+        case .idle, .checking:
+            return .secondary
+        }
+    }
+
+    private var networkDiagnosticText: String? {
+        guard !networkDiagnosticLines.isEmpty else { return nil }
+        return networkDiagnosticLines.joined(separator: "\n")
+    }
+
+    private var isCheckingOpenAI: Bool {
+        isRunningNetworkDiagnostics || apiValidationState == .checking
     }
 
     var body: some View {
@@ -359,31 +436,29 @@ struct SettingsView: View {
                 
                 Divider().padding(.horizontal)
                 
-                if appState.settings.engineType == .cloud {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(L.tr("Cloud transcription uses OpenAI's Whisper API. It is fast and highly accurate, but requires an internet connection.", "Облачная транскрибация использует OpenAI Whisper API. Это быстро и точно, но требует интернет-соединения."))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(L.tr("OpenAI API Key", "OpenAI API Key")).font(.caption).foregroundStyle(.secondary)
-                            SecureField("sk-...", text: $appState.settings.apiKey)
-                                .textFieldStyle(.roundedBorder)
-                                .onChange(of: appState.settings.apiKey) { _, _ in
-                                    appState.settings.selectedModeName = appState.settings.validatedModeName(currentName: appState.settings.selectedModeName)
-                                    appState.saveSettings()
-                                }
-                        }
-                    }
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(
+                        appState.settings.engineType == .cloud
+                            ? L.tr("Cloud transcription uses OpenAI's Whisper API. It is fast and highly accurate, but requires an internet connection.", "Облачная транскрибация использует OpenAI Whisper API. Это быстро и точно, но требует интернет-соединения.")
+                            : L.tr("Local models run entirely on your Mac. They are private and work offline. Larger models are more accurate but use more memory.", "Локальные модели работают полностью на вашем Mac. Они приватные и доступны офлайн. Более крупные модели точнее, но требуют больше памяти.")
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal)
-                    .padding(.bottom)
-                } else {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(L.tr("Local models run entirely on your Mac. They are private and work offline. Larger models are more accurate but use more memory.", "Локальные модели работают полностью на вашем Mac. Они приватные и доступны офлайн. Более крупные модели точнее, но требуют больше памяти."))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
-                        
+
+                    OpenAIAPIKeySettingsCard(
+                        apiKey: $appState.settings.apiKey,
+                        validationState: apiValidationState,
+                        isValidating: isCheckingOpenAI,
+                        statusText: apiValidationText,
+                        statusColor: apiValidationColor,
+                        diagnosticText: networkDiagnosticText,
+                        onValidate: checkOpenAI,
+                        onChanged: handleAPIKeyChanged
+                    )
+                    .padding(.horizontal)
+
+                    if appState.settings.engineType == .local {
                         VStack(spacing: 0) {
                             ForEach(LocalModelSize.allCases, id: \.self) { size in
                                 HStack {
@@ -394,9 +469,9 @@ struct SettingsView: View {
                                             .font(.system(size: 11))
                                             .foregroundStyle(.secondary)
                                     }
-                                    
+
                                     Spacer()
-                                    
+
                                     if modelManager.isModelDownloaded(size) {
                                         if appState.settings.localModelSize == size {
                                             Image(systemName: "checkmark.circle.fill")
@@ -409,7 +484,7 @@ struct SettingsView: View {
                                             }
                                             .buttonStyle(.bordered)
                                         }
-                                        
+
                                         Button(role: .destructive) {
                                             modelManager.deleteModel(size)
                                         } label: {
@@ -487,10 +562,16 @@ struct SettingsView: View {
                                     appState.saveSettings()
                                 }
                             },
+                            onEdit: mode.isBuiltIn ? nil : {
+                                beginEditing(mode)
+                            },
                             onDelete: mode.isBuiltIn ? nil : {
                                 appState.settings.customModes.removeAll { $0.id == mode.id }
                                 if appState.settings.selectedModeName == mode.name {
                                     appState.settings.selectedModeName = TranscriptionMode.dictation.name
+                                }
+                                if editingModeID == mode.id {
+                                    resetModeEditor()
                                 }
                                 appState.saveSettings()
                             }
@@ -499,67 +580,22 @@ struct SettingsView: View {
                 }
             }
             
-            Section("Create Custom Mode") {
-                VStack(alignment: .leading, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L.tr("Mode Name", "Название режима")).font(.caption).foregroundStyle(.secondary)
-                        TextField(TranscriptionMode.placeholderName, text: $newModeName)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L.tr("Description", "Описание")).font(.caption).foregroundStyle(.secondary)
-                        TextField(TranscriptionMode.placeholderDescription, text: $newModeDescription)
-                            .textFieldStyle(.roundedBorder)
-                    }
-                    
-                    HStack(spacing: 16) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(L.tr("Example Input", "Пример входа")).font(.caption).foregroundStyle(.secondary)
-                            TextEditorCustom(text: $newModeExampleInput, placeholder: TranscriptionMode.placeholderExampleInput)
-                                .frame(height: 60)
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(L.tr("Example Output", "Пример выхода")).font(.caption).foregroundStyle(.secondary)
-                            TextEditorCustom(text: $newModeExampleOutput, placeholder: TranscriptionMode.placeholderExampleOutput)
-                                .frame(height: 60)
-                        }
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(L.tr("System Prompt (Instructions for AI)", "Системный промпт (инструкции для AI)")).font(.caption).foregroundStyle(.secondary)
-                        TextEditorCustom(text: $newModePrompt, placeholder: TranscriptionMode.placeholderPrompt, isMonospaced: true)
-                            .frame(minHeight: 100)
-                    }
-                    
-                    Button {
-                        let mode = TranscriptionMode(
-                            name: newModeName,
-                            icon: newModeIcon,
-                            description: newModeDescription,
-                            exampleInput: newModeExampleInput,
-                            exampleOutput: newModeExampleOutput,
-                            systemPrompt: newModePrompt,
-                            isBuiltIn: false
-                        )
-                        appState.settings.customModes.append(mode)
-                        appState.saveSettings()
-                        newModeName = ""
-                        newModeDescription = ""
-                        newModeExampleInput = ""
-                        newModeExampleOutput = ""
-                        newModePrompt = ""
-                    } label: {
-                        Label(L.tr("Add Mode", "Добавить режим"), systemImage: "plus.circle.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .disabled(newModeName.isEmpty || newModePrompt.isEmpty)
-                }
-                .padding(.vertical, 8)
-            }
+            CustomModeEditorCard(
+                isEditing: isEditingCustomMode,
+                modeName: $newModeName,
+                modeDescription: $newModeDescription,
+                exampleInput: $newModeExampleInput,
+                exampleOutput: $newModeExampleOutput,
+                prompt: $newModePrompt,
+                icon: $newModeIcon,
+                isGeneratingExample: isGeneratingExample,
+                editorMessage: modeEditorMessage,
+                canSave: canSaveMode,
+                hasDuplicateName: duplicateModeExists,
+                onGenerateExample: runModeExample,
+                onCancel: resetModeEditor,
+                onSave: saveCustomMode
+            )
         }
     }
 
@@ -674,6 +710,133 @@ struct SettingsView: View {
         return formatter.string(fromByteCount: Int64(bytesPerSecond)) + "/s"
     }
 
+    private func handleAPIKeyChanged() {
+        apiValidationState = .idle
+        modeEditorMessage = nil
+        networkDiagnosticLines.removeAll()
+        Storage.shared.saveSettings(appState.settings)
+    }
+
+    private func checkOpenAI() {
+        isRunningNetworkDiagnostics = true
+        apiValidationState = .idle
+        networkDiagnosticLines = []
+        apiValidationState = .checking
+        let currentKey = appState.settings.apiKey
+
+        Task {
+            let report = await OpenAIAPIKeyValidator.diagnoseNetwork()
+            let result = currentKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? OpenAIAPIKeyValidationState.idle
+                : await OpenAIAPIKeyValidator.validate(currentKey)
+            await MainActor.run {
+                isRunningNetworkDiagnostics = false
+                networkDiagnosticLines = report.lines
+                apiValidationState = result
+            }
+        }
+    }
+
+    private func beginEditing(_ mode: TranscriptionMode) {
+        editingModeID = mode.id
+        newModeName = mode.name
+        newModeDescription = mode.description
+        newModeExampleInput = mode.exampleInput
+        newModeExampleOutput = mode.exampleOutput
+        newModePrompt = mode.systemPrompt
+        newModeIcon = mode.icon
+        modeEditorMessage = nil
+    }
+
+    private func resetModeEditor() {
+        editingModeID = nil
+        newModeName = ""
+        newModeDescription = ""
+        newModeExampleInput = ""
+        newModeExampleOutput = ""
+        newModePrompt = ""
+        newModeIcon = "sparkles"
+        modeEditorMessage = nil
+        isGeneratingExample = false
+    }
+
+    private func saveCustomMode() {
+        guard canSaveMode else { return }
+
+        let mode = TranscriptionMode(
+            name: normalizedModeName,
+            icon: newModeIcon,
+            description: normalizedModeDescription.isEmpty ? TranscriptionMode.placeholderDescription : normalizedModeDescription,
+            exampleInput: normalizedModeExampleInput.isEmpty ? TranscriptionMode.placeholderExampleInput : normalizedModeExampleInput,
+            exampleOutput: normalizedModeExampleOutput.isEmpty ? TranscriptionMode.placeholderExampleOutput : normalizedModeExampleOutput,
+            systemPrompt: normalizedModePrompt,
+            isBuiltIn: false
+        )
+
+        if let editingModeID,
+           let index = appState.settings.customModes.firstIndex(where: { $0.id == editingModeID }) {
+            let previousName = appState.settings.customModes[index].name
+            appState.settings.customModes[index] = mode
+            if appState.settings.selectedModeName == previousName {
+                appState.settings.selectedModeName = mode.name
+            }
+        } else {
+            appState.settings.customModes.append(mode)
+        }
+
+        appState.saveSettings()
+        resetModeEditor()
+    }
+
+    private func runModeExample() {
+        let exampleInput = normalizedModeExampleInput
+        let prompt = normalizedModePrompt
+
+        guard !exampleInput.isEmpty else {
+            modeEditorMessage = L.tr("Add example input first.", "Сначала добавьте пример входа.")
+            return
+        }
+
+        guard !prompt.isEmpty else {
+            modeEditorMessage = L.tr("Add a system prompt first.", "Сначала добавьте системный промпт.")
+            return
+        }
+
+        guard appState.settings.hasOpenAIAPIKey else {
+            modeEditorMessage = L.tr("Add and validate an OpenAI API key first.", "Сначала добавьте и проверьте OpenAI API key.")
+            return
+        }
+
+        isGeneratingExample = true
+        modeEditorMessage = nil
+
+        let temporaryMode = TranscriptionMode(
+            name: normalizedModeName.isEmpty ? TranscriptionMode.placeholderName : normalizedModeName,
+            icon: newModeIcon,
+            description: normalizedModeDescription.isEmpty ? TranscriptionMode.placeholderDescription : normalizedModeDescription,
+            exampleInput: exampleInput,
+            exampleOutput: normalizedModeExampleOutput,
+            systemPrompt: prompt,
+            isBuiltIn: false
+        )
+
+        Task {
+            do {
+                let result = try await PostProcessor(settings: appState.settings).process(text: exampleInput, mode: temporaryMode)
+                await MainActor.run {
+                    newModeExampleOutput = result.text
+                    isGeneratingExample = false
+                    modeEditorMessage = L.tr("Example output updated.", "Пример выхода обновлён.")
+                }
+            } catch {
+                await MainActor.run {
+                    isGeneratingExample = false
+                    modeEditorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
     private func formatDuration(_ duration: TimeInterval) -> String {
         if duration < 60 {
             return "\(Int(duration))s"
@@ -697,10 +860,6 @@ struct AIConfigView: View {
         settings.engineType == .cloud || settings.enableSpeakerDiarization || settings.hasOpenAIAPIKey
     }
 
-    private var shouldShowDedicatedDiarizationAPIKey: Bool {
-        settings.engineType != .cloud
-    }
-    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
@@ -714,30 +873,12 @@ struct AIConfigView: View {
                     .foregroundStyle(.secondary)
                     .padding(.leading, 22)
             }
-            
-            if settings.enablePostProcessing {
-                Divider()
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(L.tr("OpenAI API Key", "OpenAI API Key")).font(.caption).foregroundStyle(.secondary)
-                            if settings.engineType == .cloud {
-                                Text(L.tr("(Using key from Transcription Engine)", "(Используется ключ из блока транскрибации)")).font(.system(size: 9)).foregroundStyle(Color.accentColor)
-                            }
-                        }
-                        SecureField("sk-...", text: $settings.apiKey)
-                            .textFieldStyle(.roundedBorder)
-                            .onChange(of: settings.apiKey) { _, _ in
-                                settings.selectedModeName = settings.validatedModeName(currentName: settings.selectedModeName)
-                                onSave()
-                            }
-                        Text(L.tr("OpenAI GPT: reliable formatting and structuring.", "OpenAI GPT: надёжное форматирование и структурирование."))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
+
+            Divider()
+
+            Text(L.tr("AI refinement and diarization use the global OpenAI key from the Engine & API section.", "AI-обработка и диаризация используют глобальный OpenAI key из раздела «Движок и API»."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
             
             if shouldShowDiarizationControls {
                 Divider()
@@ -747,21 +888,6 @@ struct AIConfigView: View {
                         .onChange(of: settings.enableSpeakerDiarization) { _, _ in 
                             onSave() 
                         }
-
-                    if shouldShowDedicatedDiarizationAPIKey {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(L.tr("OpenAI API Key", "OpenAI API Key")).font(.caption).foregroundStyle(.secondary)
-                            SecureField("sk-...", text: $settings.apiKey)
-                                .textFieldStyle(.roundedBorder)
-                                .onChange(of: settings.apiKey) { _, _ in
-                                    settings.selectedModeName = settings.validatedModeName(currentName: settings.selectedModeName)
-                                    onSave()
-                                }
-                            Text(L.tr("Required for diarization when transcription runs locally.", "Нужно для диаризации, когда транскрибация выполняется локально."))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
                     
                     Text(L.tr("Uses AI to identify and split different speakers in the transcription. Best for interviews and meetings.", "Использует AI для определения и разделения разных спикеров в транскрипции. Лучше всего подходит для интервью и встреч."))
                         .font(.caption)
@@ -784,11 +910,205 @@ struct AIConfigView: View {
     }
 }
 
+struct OpenAIAPIKeySettingsCard: View {
+    @Binding var apiKey: String
+    let validationState: OpenAIAPIKeyValidationState
+    let isValidating: Bool
+    let statusText: String?
+    let statusColor: Color
+    let diagnosticText: String?
+    let onValidate: () -> Void
+    let onChanged: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L.tr("OpenAI API Key", "OpenAI API Key"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 10) {
+                SecureField("sk-...", text: $apiKey)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: apiKey) { _, _ in
+                        onChanged()
+                    }
+
+                Button(action: onValidate) {
+                    Group {
+                        if isValidating {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text(L.tr("Check OpenAI", "Проверить OpenAI"))
+                        }
+                    }
+                    .frame(minWidth: 120)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(isValidating)
+            }
+
+            if let statusText {
+                HStack(spacing: 6) {
+                    Image(systemName: validationIcon)
+                    Text(statusText)
+                }
+                .font(.caption)
+                .foregroundStyle(statusColor)
+            }
+
+            if let diagnosticText {
+                Text(diagnosticText)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.primary.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+
+            Text(L.tr("Used for cloud transcription, AI refinement, diarization, and custom mode example runs.", "Используется для облачной транскрибации, AI-обработки, диаризации и тестового прогона custom mode."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(16)
+        .background(Color.primary.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var validationIcon: String {
+        switch validationState {
+        case .valid:
+            return "checkmark.circle.fill"
+        case .invalid, .networkError, .failed:
+            return "exclamationmark.triangle.fill"
+        case .idle, .checking:
+            return "info.circle.fill"
+        }
+    }
+}
+
+struct CustomModeEditorCard: View {
+    let isEditing: Bool
+    @Binding var modeName: String
+    @Binding var modeDescription: String
+    @Binding var exampleInput: String
+    @Binding var exampleOutput: String
+    @Binding var prompt: String
+    @Binding var icon: String
+    let isGeneratingExample: Bool
+    let editorMessage: String?
+    let canSave: Bool
+    let hasDuplicateName: Bool
+    let onGenerateExample: () -> Void
+    let onCancel: () -> Void
+    let onSave: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(isEditing ? L.tr("Edit Custom Mode", "Изменить custom mode") : L.tr("Create Custom Mode", "Создать custom mode"))
+                        .font(.headline)
+                    Text(L.tr("Define the prompt, then run an example input and save the result as the mode preview.", "Задайте промпт, затем прогоните пример входа и сохраните результат как превью режима."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if isEditing {
+                    Button(L.tr("Cancel", "Отмена"), action: onCancel)
+                        .buttonStyle(.bordered)
+                }
+            }
+
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L.tr("Mode Name", "Название режима")).font(.caption).foregroundStyle(.secondary)
+                    TextField(TranscriptionMode.placeholderName, text: $modeName)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L.tr("Icon", "Иконка")).font(.caption).foregroundStyle(.secondary)
+                    TextField("sparkles", text: $icon)
+                        .textFieldStyle(.roundedBorder)
+                }
+                .frame(width: 120)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L.tr("Description", "Описание")).font(.caption).foregroundStyle(.secondary)
+                TextField(TranscriptionMode.placeholderDescription, text: $modeDescription)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L.tr("Example Input", "Пример входа")).font(.caption).foregroundStyle(.secondary)
+                    TextEditorCustom(text: $exampleInput, placeholder: TranscriptionMode.placeholderExampleInput)
+                        .frame(height: 100)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(L.tr("Example Output", "Пример выхода")).font(.caption).foregroundStyle(.secondary)
+                    TextEditorCustom(text: $exampleOutput, placeholder: TranscriptionMode.placeholderExampleOutput)
+                        .frame(height: 100)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L.tr("System Prompt", "Системный промпт")).font(.caption).foregroundStyle(.secondary)
+                TextEditorCustom(text: $prompt, placeholder: TranscriptionMode.placeholderPrompt, isMonospaced: true)
+                    .frame(minHeight: 120)
+            }
+
+            HStack(spacing: 10) {
+                Button(action: onGenerateExample) {
+                    Group {
+                        if isGeneratingExample {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Label(L.tr("Run Example", "Прогнать пример"), systemImage: "play.fill")
+                        }
+                    }
+                    .frame(minWidth: 150)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isGeneratingExample)
+
+                Button(action: onSave) {
+                    Label(isEditing ? L.tr("Save Changes", "Сохранить изменения") : L.tr("Add Mode", "Добавить режим"), systemImage: isEditing ? "checkmark.circle.fill" : "plus.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!canSave)
+            }
+
+            if hasDuplicateName {
+                Text(L.tr("A mode with this name already exists.", "Режим с таким названием уже существует."))
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            } else if let editorMessage, !editorMessage.isEmpty {
+                Text(editorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(20)
+        .background(Color.primary.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
 struct ModeCard: View {
     let mode: TranscriptionMode
     let isSelected: Bool
     let isEnabled: Bool
     let onSelect: () -> Void
+    let onEdit: (() -> Void)?
     let onDelete: (() -> Void)?
 
     var body: some View {
@@ -836,6 +1156,14 @@ struct ModeCard: View {
                         .labelsHidden()
                         .disabled(!isEnabled)
                     
+                    if let onEdit = onEdit {
+                        Button(action: onEdit) {
+                            Image(systemName: "pencil")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     if let onDelete = onDelete {
                         Button(action: onDelete) {
                             Image(systemName: "trash")

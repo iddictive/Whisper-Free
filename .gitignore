@@ -46,3 +46,7 @@ scripts/fix_icon_padding.sh
 crash_report_*.txt
 whisper_input_*.wav
 debug_paths.swift
+
+# --- Local env ---
+.env
+.env.local

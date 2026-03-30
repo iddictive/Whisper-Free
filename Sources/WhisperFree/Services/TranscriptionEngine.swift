@@ -26,7 +26,7 @@ enum TranscriptionError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .noAPIKey:
-            return "No API key configured. Please add your OpenAI API key in Settings."
+            return "No API key configured. Please add your OpenAI API key in Settings → Engine & API."
         case .invalidResponse:
             return "Invalid response from transcription service."
         case .networkError(let msg):
@@ -45,7 +45,7 @@ struct TranscriptionEngineFactory {
     static func create(for type: TranscriptionEngineType, settings: AppSettings) -> TranscriptionEngine {
         switch type {
         case .cloud:
-            return CloudWhisper(apiKey: settings.apiKey)
+            return CloudWhisper(apiKey: settings.normalizedAPIKey)
         case .local:
             return LocalWhisper(modelSize: settings.localModelSize)
         }

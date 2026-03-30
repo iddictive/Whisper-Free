@@ -102,7 +102,9 @@ final class AppState: ObservableObject {
         print("🚀 AppState initializing...")
         self.settings = Storage.shared.loadSettings()
         self.history = Storage.shared.loadHistory()
+        self.settings.normalizeBeforeSaving()
         sanitizeDisabledFeatureState()
+        Storage.shared.saveSettings(self.settings)
         print("📦 Settings and History loaded")
         
         // Initial setup
@@ -204,6 +206,7 @@ final class AppState: ObservableObject {
     // MARK: - Settings
 
     func saveSettings() {
+        settings.normalizeBeforeSaving()
         Storage.shared.saveSettings(settings)
         hotkeyManager.config = settings.hotkeyConfig
     }
@@ -376,8 +379,18 @@ final class AppState: ObservableObject {
     // MARK: - Recording Actions
 
     private func validateTranscriptionPrerequisites(requiresMicrophone: Bool) -> Bool {
-        if settings.engineType == .cloud && settings.apiKey.trimmingCharacters(in: .whitespaces).isEmpty {
-            showError("No API key configured. Go to Settings → General to add your OpenAI API key.")
+        if settings.engineType == .cloud && !settings.hasOpenAIAPIKey {
+            showError("No API key configured. Go to Settings → Engine & API to add your OpenAI API key.")
+            return false
+        }
+
+        if settings.selectedMode.requiresAI && !settings.enablePostProcessing {
+            showError("The selected mode requires AI Refinement. Enable it in Settings → Engine & API.")
+            return false
+        }
+
+        if settings.selectedMode.requiresAI && !settings.hasOpenAIAPIKey {
+            showError("The selected mode requires a valid OpenAI API key. Add it in Settings → Engine & API.")
             return false
         }
 
@@ -472,6 +485,7 @@ final class AppState: ObservableObject {
 
             var processedText = rawText
             var usage: UsageLog? = nil
+            var processingErrorMessage: String?
 
             let shouldRunDiarization = settings.enableSpeakerDiarization && settings.canUseSpeakerDiarization
             let shouldRunStandardPostProcessing = !shouldRunDiarization
@@ -503,6 +517,7 @@ final class AppState: ObservableObject {
                     }
                 } catch {
                     print("⚠️ AI refinement failed during retranscription: \(error)")
+                    processingErrorMessage = error.localizedDescription
                     processingStage = .transcribing
                 }
             }
@@ -529,6 +544,7 @@ final class AppState: ObservableObject {
                     )
                 } catch {
                     print("⚠️ Diarization failed during retranscription: \(error)")
+                    processingErrorMessage = error.localizedDescription
                 }
             }
 
@@ -537,6 +553,7 @@ final class AppState: ObservableObject {
             history[index].rawText = rawText
             history[index].processedText = processedText
             history[index].summaryText = nil
+            history[index].processingError = processingErrorMessage
             history[index].modeName = settings.selectedMode.name
             history[index].engineUsed = settings.engineType.rawValue
                 + (shouldRunStandardPostProcessing ? " + AI" : "")
@@ -553,6 +570,10 @@ final class AppState: ObservableObject {
 
             lastTranscription = processedText
         } catch {
+            if let index = history.firstIndex(where: { $0.entryId == entry.entryId }) {
+                history[index].processingError = error.localizedDescription
+                Storage.shared.updateTranscriptionHistoryEntry(history[index])
+            }
             showError(error.localizedDescription)
         }
     }
@@ -573,6 +594,13 @@ final class AppState: ObservableObject {
         processingStage = .transcribing
 
         Task { @MainActor in
+            var rawText = ""
+            var processedText = ""
+            var usage: UsageLog? = nil
+            var processingErrorMessage: String?
+            let selectedModeName = settings.selectedMode.name
+            let selectedEngine = settings.engineType.rawValue
+
             do {
                 // Diagnostic: check audio file before sending
                 let fileAttrs = try? FileManager.default.attributesOfItem(atPath: audioURL.path)
@@ -587,7 +615,7 @@ final class AppState: ObservableObject {
                 let engine = TranscriptionEngineFactory.create(for: settings.engineType, settings: settings)
                 self.currentEngine = engine
                 let lang = settings.language == "auto" ? nil : settings.language
-                let rawText = try await engine.transcribe(audioURL: audioURL, language: lang, timeRange: nil, onProgress: nil)
+                rawText = try await engine.transcribe(audioURL: audioURL, language: lang, timeRange: nil, onProgress: nil)
                 self.currentEngine = nil
                 
                 print("whisper_debug: 📝 Raw transcription result: '\(rawText)' (length: \(rawText.count))")
@@ -608,8 +636,7 @@ final class AppState: ObservableObject {
                 }
 
                 // 2. Post-process (if enabled and instant typing is OFF)
-                var processedText = rawText
-                var usage: UsageLog? = nil
+                processedText = rawText
                 
                 let shouldRunDiarization = settings.enableSpeakerDiarization && settings.canUseSpeakerDiarization
                 let shouldRunStandardPostProcessing = !shouldRunDiarization
@@ -642,7 +669,8 @@ final class AppState: ObservableObject {
                         }
                     } catch {
                         print("⚠️ AI refinement failed: \(error)")
-                        self.showError("AI refinement failed. Using raw text.")
+                        processingErrorMessage = error.localizedDescription
+                        self.showError(postProcessingFallbackMessage(for: error))
                         processingStage = .transcribing // revert stage
                     }
                 }
@@ -671,6 +699,7 @@ final class AppState: ObservableObject {
                         )
                     } catch {
                         print("⚠️ Diarization failed: \(error)")
+                        processingErrorMessage = error.localizedDescription
                     }
                 }
 
@@ -714,11 +743,13 @@ final class AppState: ObservableObject {
                 let entry = TranscriptionHistoryEntry(
                     rawText: rawText,
                     processedText: processedText,
-                    modeName: settings.selectedMode.name,
+                    processingError: processingErrorMessage,
+                    modeName: selectedModeName,
                     duration: recordingDuration,
                     engineUsed: settings.engineType.rawValue + (shouldRunStandardPostProcessing ? " + AI" : "") + (shouldRunDiarization ? " + Diarization" : ""),
                     usage: usage,
-                    audioFilePath: persistentAudioPath
+                    audioFilePath: persistentAudioPath,
+                    ownsAudioFile: persistentAudioPath != nil
                 )
                 Storage.shared.addTranscriptionHistoryEntry(entry)
                 history.insert(entry, at: 0)
@@ -738,12 +769,45 @@ final class AppState: ObservableObject {
 
             } catch {
                 print("whisper_debug: ❌ Transcription task failed: \(error)")
+                let persistentAudioPath = persistRecordingAudio(from: audioURL)
+                let fallbackText = processedText.isEmpty ? rawText : processedText
+                let entry = TranscriptionHistoryEntry(
+                    rawText: rawText,
+                    processedText: fallbackText,
+                    processingError: error.localizedDescription,
+                    modeName: selectedModeName,
+                    duration: recordingDuration,
+                    engineUsed: selectedEngine + " + Error",
+                    usage: usage,
+                    audioFilePath: persistentAudioPath,
+                    ownsAudioFile: persistentAudioPath != nil
+                )
+                Storage.shared.addTranscriptionHistoryEntry(entry)
+                history.insert(entry, at: 0)
                 showError(error.localizedDescription)
                 state = .idle
                 processingStage = .none
                 recorder.cleanup()
                 currentEngine = nil
             }
+        }
+    }
+
+    private func persistRecordingAudio(from sourceURL: URL) -> String? {
+        let fileName = "recording_\(UUID().uuidString).wav"
+        let targetURL = Storage.recordingsDirectory.appendingPathComponent(fileName)
+
+        do {
+            if FileManager.default.fileExists(atPath: targetURL.path) {
+                try FileManager.default.removeItem(at: targetURL)
+            }
+
+            try FileManager.default.moveItem(at: sourceURL, to: targetURL)
+            print("whisper_debug: 📁 Moved recording to: \(targetURL.path)")
+            return targetURL.path
+        } catch {
+            print("whisper_debug: ❌ Failed to move recording: \(error)")
+            return nil
         }
     }
 
@@ -761,6 +825,25 @@ final class AppState: ObservableObject {
     private func cancelPendingStopTask() {
         pendingStopTask?.cancel()
         pendingStopTask = nil
+    }
+
+    private func postProcessingFallbackMessage(for error: Error) -> String {
+        if let transcriptionError = error as? TranscriptionError {
+            switch transcriptionError {
+            case .noAPIKey:
+                return "AI refinement skipped: OpenAI API key is missing. Using the raw transcript."
+            case .networkError(let message):
+                return "AI refinement failed: \(message) Using the raw transcript."
+            case .invalidResponse:
+                return "AI refinement failed: invalid response from the AI service. Using the raw transcript."
+            case .modelNotDownloaded:
+                return "AI refinement failed: local model is missing. Using the raw transcript."
+            case .transcriptionFailed(let message):
+                return "AI refinement failed: \(message) Using the raw transcript."
+            }
+        }
+
+        return "AI refinement failed. Using the raw transcript."
     }
 
     func showError(_ message: String) {

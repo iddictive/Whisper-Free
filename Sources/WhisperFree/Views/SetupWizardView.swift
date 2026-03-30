@@ -10,8 +10,7 @@ struct SetupWizardView: View {
     @State private var apiKey = ""
     @State private var selectedEngine: TranscriptionEngineType = .cloud
     @State private var selectedModel: LocalModelSize = .base
-    @State private var isTestingAPI = false
-    @State private var apiTestResult: String?
+    @State private var apiValidationState: OpenAIAPIKeyValidationState = .idle
     @State private var micGranted = false
     @State private var whisperInstalled = false
     @State private var animateGlow = false
@@ -29,6 +28,36 @@ struct SetupWizardView: View {
     private let borderSubtle = Color(white: 1.0, opacity: 0.08)
     private let textPrimary = Color.white
     private let textSecondary = Color(white: 0.55)
+
+    private var apiValidationText: String? {
+        switch apiValidationState {
+        case .idle:
+            return apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? nil
+                : L.tr("Key not checked yet.", "Ключ ещё не проверен.")
+        case .checking:
+            return L.tr("Checking key…", "Проверяю ключ…")
+        case .valid:
+            return L.tr("Key is valid.", "Ключ валиден.")
+        case .invalid:
+            return L.tr("Key is invalid.", "Ключ невалиден.")
+        case .networkError(let message):
+            return L.tr("Could not reach OpenAI. \(message)", "Не удалось связаться с OpenAI. \(message)")
+        case .failed(let statusCode):
+            return L.tr("Validation failed (HTTP \(statusCode)).", "Проверка не удалась (HTTP \(statusCode)).")
+        }
+    }
+
+    private var apiValidationColor: Color {
+        switch apiValidationState {
+        case .valid:
+            return .green
+        case .invalid, .networkError, .failed:
+            return .red
+        case .idle, .checking:
+            return textSecondary
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -681,12 +710,15 @@ struct SetupWizardView: View {
                             RoundedRectangle(cornerRadius: 8)
                                 .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
                         )
+                        .onChange(of: apiKey) { _, _ in
+                            apiValidationState = .idle
+                        }
 
                     Button {
                         testAPI()
                     } label: {
                         Group {
-                            if isTestingAPI {
+                            if apiValidationState == .checking {
                                 ProgressView().controlSize(.mini).tint(accentGold)
                             } else {
                                 Text(L.tr("Test", "Проверить"))
@@ -700,16 +732,16 @@ struct SetupWizardView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
-                    .disabled(apiKey.isEmpty || isTestingAPI)
+                    .disabled(apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || apiValidationState == .checking)
                 }
 
-                if let result = apiTestResult {
+                if let result = apiValidationText {
                     HStack(spacing: 6) {
-                        Image(systemName: result.contains("✓") ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        Image(systemName: apiValidationState == .valid ? "checkmark.circle.fill" : "info.circle.fill")
                         Text(result)
                     }
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(result.contains("✓") ? Color.accentColor : .red)
+                    .foregroundStyle(apiValidationColor)
                 }
 
                 Link(destination: URL(string: "https://platform.openai.com/api-keys")!) {
@@ -961,30 +993,23 @@ struct SetupWizardView: View {
     }
 
     private func testAPI() {
-        isTestingAPI = true
-        apiTestResult = nil
+        apiValidationState = .checking
+        let currentKey = apiKey
         Task {
-            let url = URL(string: "https://api.openai.com/v1/models")!
-            var request = URLRequest(url: url)
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-            do {
-                let (_, response) = try await URLSession.shared.data(for: request)
-                apiTestResult = (response as? HTTPURLResponse)?.statusCode == 200
-                    ? "✓ Valid" : "✗ Invalid key"
-            } catch {
-                apiTestResult = "✗ Connection failed"
+            let result = await OpenAIAPIKeyValidator.validate(currentKey)
+            await MainActor.run {
+                apiValidationState = result
             }
-            isTestingAPI = false
         }
     }
 
     private func finishSetup() {
-        appState.settings.apiKey = apiKey
+        appState.settings.apiKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         appState.settings.engineType = selectedEngine
         appState.settings.localModelSize = selectedModel
         
         // If no API key is provided, default to Raw mode to avoid AI processing errors
-        if apiKey.trimmingCharacters(in: .whitespaces).isEmpty {
+        if appState.settings.apiKey.isEmpty {
             print("whisper_debug: 🗝️ No API key provided, defaulting to Raw mode")
             appState.settings.selectedModeName = "Raw"
         }

@@ -17,17 +17,17 @@ final class PostProcessor {
 
     func process(text: String, mode: TranscriptionMode) async throws -> ProcessedResult {
         let engine = PostProcessingEngine.openai
-        let apiKey = settings.apiKey
+        let apiKey = settings.normalizedAPIKey
         
-        guard !apiKey.isEmpty else { return ProcessedResult(text: text, promptTokens: 0, completionTokens: 0, engine: engine) }
+        guard !apiKey.isEmpty else { throw TranscriptionError.noAPIKey }
         guard !text.isEmpty else { return ProcessedResult(text: text, promptTokens: 0, completionTokens: 0, engine: engine) }
 
         return try await openAIChat(systemPrompt: mode.systemPrompt, userText: text, temperature: 0.3, maxTokens: 2048)
     }
 
     func diarize(text: String) async throws -> ProcessedResult {
-        let apiKey = settings.apiKey
-        guard !apiKey.isEmpty else { return ProcessedResult(text: text, promptTokens: 0, completionTokens: 0, engine: .openai) }
+        let apiKey = settings.normalizedAPIKey
+        guard !apiKey.isEmpty else { throw TranscriptionError.noAPIKey }
         guard !text.isEmpty else { return ProcessedResult(text: text, promptTokens: 0, completionTokens: 0, engine: .openai) }
 
         let systemPrompt = """
@@ -87,7 +87,7 @@ final class PostProcessor {
 
     private func openAIChat(systemPrompt: String, userText: String, temperature: Double, maxTokens: Int) async throws -> ProcessedResult {
         let engine = PostProcessingEngine.openai
-        let apiKey = settings.apiKey
+        let apiKey = settings.normalizedAPIKey
         let url = URL(string: "https://api.openai.com/v1/chat/completions")!
         let model = "gpt-4o-mini"
 
@@ -114,8 +114,13 @@ final class PostProcessor {
             throw TranscriptionError.networkError("Invalid API Key for \(engine.rawValue).")
         }
 
+        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 429 {
+            let errorText = openAIErrorMessage(from: data) ?? "OpenAI quota exceeded. Check billing and project limits."
+            throw TranscriptionError.networkError(errorText)
+        }
+
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            let errorText = String(data: data, encoding: .utf8) ?? "Unknown error"
+            let errorText = openAIErrorMessage(from: data) ?? String(data: data, encoding: .utf8) ?? "Unknown error"
             throw TranscriptionError.networkError("\(engine.rawValue) post-processing failed: \(errorText)")
         }
 
@@ -135,6 +140,15 @@ final class PostProcessor {
             completionTokens: usage["completion_tokens"] as? Int ?? 0,
             engine: engine
         )
+    }
+
+    private func openAIErrorMessage(from data: Data) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let error = json["error"] as? [String: Any],
+              let message = error["message"] as? String else {
+            return nil
+        }
+        return message
     }
 
     private enum FollowUpEngine {

@@ -262,6 +262,16 @@ struct HistoryView: View {
                     .clipShape(Capsule())
             }
 
+            if entry.processingError?.isEmpty == false {
+                Text(L.tr("ERROR", "ОШИБКА"))
+                    .font(.system(size: 9, weight: .bold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.red.opacity(0.15))
+                    .foregroundStyle(.red)
+                    .clipShape(Capsule())
+            }
+
             Spacer()
 
             Text(entry.date, style: .relative)
@@ -272,7 +282,7 @@ struct HistoryView: View {
 
     private func rowContent(_ entry: TranscriptionHistoryEntry) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(entry.summaryText ?? entry.processedText)
+            Text(preferredDisplayText(for: entry))
                 .font(.system(size: 13, weight: .medium))
                 .lineLimit(expandedEntryId == entry.entryId ? nil : 3)
                 .onTapGesture {
@@ -311,6 +321,21 @@ struct HistoryView: View {
                     .background(Color.primary.opacity(0.04))
                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
+
+                if let processingError = entry.processingError, !processingError.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(L.tr("PROCESSING ERROR", "ОШИБКА ОБРАБОТКИ"))
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.secondary)
+                        Text(processingError)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.red)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.red.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
             }
         }
     }
@@ -319,7 +344,7 @@ struct HistoryView: View {
         HStack(spacing: 12) {
             Button {
                 NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(entry.summaryText ?? entry.processedText, forType: .string)
+                NSPasteboard.general.setString(preferredDisplayText(for: entry), forType: .string)
             } label: {
                 Label(L.tr("Copy", "Копировать"), systemImage: "doc.on.doc.fill")
                     .font(.system(size: 11, weight: .bold))
@@ -410,6 +435,22 @@ struct HistoryView: View {
             .buttonStyle(.plain)
             .foregroundStyle(.red.opacity(0.8))
         }
+    }
+
+    private func preferredDisplayText(for entry: TranscriptionHistoryEntry) -> String {
+        if let summary = entry.summaryText, !summary.isEmpty {
+            return summary
+        }
+
+        if !entry.processedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return entry.processedText
+        }
+
+        if !entry.rawText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return entry.rawText
+        }
+
+        return entry.processingError ?? ""
     }
 
     private func formatSavedTime(_ time: TimeInterval) -> String {

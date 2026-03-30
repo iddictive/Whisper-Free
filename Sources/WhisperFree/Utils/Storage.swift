@@ -65,7 +65,7 @@ final class Storage {
         if history.count > 500 {
             let toDelete = history.suffix(from: 500)
             for entry in toDelete {
-                if let path = entry.audioFilePath {
+                if entry.ownsAudioFile, let path = entry.audioFilePath {
                     try? FileManager.default.removeItem(atPath: path)
                 }
             }
@@ -77,7 +77,7 @@ final class Storage {
     func deleteTranscriptionHistoryEntry(id: UUID) {
         var history = loadHistory()
         if let entry = history.first(where: { $0.entryId == id }) {
-            if let path = entry.audioFilePath {
+            if entry.ownsAudioFile, let path = entry.audioFilePath {
                 try? FileManager.default.removeItem(atPath: path)
             }
         }
@@ -96,7 +96,7 @@ final class Storage {
     func clearHistory() {
         let history = loadHistory()
         for entry in history {
-            if let path = entry.audioFilePath {
+            if entry.ownsAudioFile, let path = entry.audioFilePath {
                 try? FileManager.default.removeItem(atPath: path)
             }
         }
@@ -114,7 +114,7 @@ final class Storage {
             let diff = Calendar.current.dateComponents([.day], from: entry.date, to: now).day ?? 0
             if diff >= days {
                 // Delete audio file
-                if let path = entry.audioFilePath {
+                if entry.ownsAudioFile, let path = entry.audioFilePath {
                     try? FileManager.default.removeItem(atPath: path)
                 }
                 // Do not add to newHistory

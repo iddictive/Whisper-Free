@@ -225,7 +225,9 @@ final class QueueItem: ObservableObject, Identifiable {
                         duration: 0,
                         engineUsed: settings.engineType.rawValue + (totalPromptTokens + totalCompletionTokens > 0 ? " + AI" : ""),
                         usage: usage,
-                        isFromFileImport: true
+                        isFromFileImport: true,
+                        audioFilePath: self.url.path,
+                        ownsAudioFile: false
                     )
                     self.historyEntryID = entry.entryId
                     Storage.shared.addTranscriptionHistoryEntry(entry)
@@ -233,6 +235,24 @@ final class QueueItem: ObservableObject, Identifiable {
                 }
             } catch {
                 await MainActor.run {
+                    let rawText = self.rawResult ?? ""
+                    let processedText = self.result ?? self.rawResult ?? ""
+                    let entry = TranscriptionHistoryEntry(
+                        rawText: rawText,
+                        processedText: processedText,
+                        processingError: error.localizedDescription,
+                        modeName: settings.selectedMode.name,
+                        duration: 0,
+                        engineUsed: settings.engineType.rawValue + " + Error",
+                        usage: nil,
+                        isFromFileImport: true,
+                        audioFilePath: self.url.path,
+                        ownsAudioFile: false
+                    )
+                    self.historyEntryID = entry.entryId
+                    Storage.shared.addTranscriptionHistoryEntry(entry)
+                    appState.history.insert(entry, at: 0)
+
                     if self.status != .cancelled {
                         self.status = .error(error.localizedDescription)
                     }

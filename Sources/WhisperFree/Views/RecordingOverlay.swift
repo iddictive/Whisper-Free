@@ -203,6 +203,9 @@ private class GhostPanel: NSPanel {
 @MainActor
 final class OverlayWindowController: NSObject, ObservableObject {
     private var panel: NSPanel?
+    private let panelWidth: CGFloat = 500
+    private let panelHeight: CGFloat = 80
+    private let topMargin: CGFloat = 12
 
     func show(appState: AppState) {
         if panel == nil {
@@ -213,15 +216,10 @@ final class OverlayWindowController: NSObject, ObservableObject {
             let hostingView = NSHostingView(rootView: content)
             hostingView.translatesAutoresizingMaskIntoConstraints = false
 
-            guard let screen = NSScreen.main else { return }
-            let panelWidth: CGFloat = 500
-            let panelHeight: CGFloat = 80
-            let safeTop = screen.frame.maxY - screen.visibleFrame.maxY
-            let x = screen.frame.midX - (panelWidth / 2)
-            let y = screen.frame.maxY - panelHeight - safeTop
+            guard let frame = overlayFrame() else { return }
 
             let newPanel = GhostPanel(
-                contentRect: NSRect(x: x, y: y, width: panelWidth, height: panelHeight),
+                contentRect: frame,
                 styleMask: [.borderless, .nonactivatingPanel],
                 backing: .buffered,
                 defer: false
@@ -240,11 +238,27 @@ final class OverlayWindowController: NSObject, ObservableObject {
             newPanel.contentView = hostingView
             self.panel = newPanel
         }
-        
+
+        if let frame = overlayFrame() {
+            panel?.setFrame(frame, display: true)
+        }
         panel?.orderFront(nil)
     }
 
     func hide() {
         panel?.orderOut(nil)
+    }
+
+    private func overlayFrame() -> NSRect? {
+        let mouseLocation = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) })
+            ?? NSScreen.main
+            ?? NSScreen.screens.first
+        guard let screen else { return nil }
+
+        let visibleFrame = screen.visibleFrame
+        let x = visibleFrame.midX - (panelWidth / 2)
+        let y = visibleFrame.maxY - panelHeight - topMargin
+        return NSRect(x: x, y: y, width: panelWidth, height: panelHeight)
     }
 }
